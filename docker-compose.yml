@@ -1,0 +1,11 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: queenb-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - queenb-mongodb-data:/data/db
+
+volumes:
+  queenb-mongodb-data:

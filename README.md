@@ -1,200 +1,93 @@
-# QueenB - Full Stack Task Management Application
-A template for building a full-stack web application using modern technologies - fork this repository to get started quickly.
+# QueenB Match
 
-Built with Node.js, Express, React, and Material UI.
+QueenB Match is a mentoring coordination app for matching mentees with mentors in the community.
 
-## 🚀 Features
+## Tech Stack
 
-- **Modern UI**: Beautiful, responsive interface built with Material UI
-- **RESTful API**: Well-structured backend API with Express.js
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- Frontend: React, TypeScript, Material UI, FullCalendar
+- Backend: Node.js, Express, TypeScript
+- Database: MongoDB with Mongoose
+- Auth: JWT login tokens and hashed passwords
 
-## 🛠️ Tech Stack
+## What The MVP Includes
 
-### Backend
+- Register and login
+- Every new user is a regular user and can request mentoring as a mentee
+- A user becomes a mentor by creating a mentor profile
+- Mentor list
+- Meeting request flow
+- Mentor proposes times
+- Mentee chooses one proposed time
+- Hebrew RTL interface
+- Home page calendar with month, week, and day views
+- Mentor/mentee meeting switch for users who are mentors
+- Admin dashboard for users and meetings
 
-- **Node.js** - Runtime environment
-- **Express.js** - Web framework
-- **CORS** - Cross-origin resource sharing
-- **Nodemon** - Development auto-restart
+## Local Setup
 
-### Frontend
+Use `npm.cmd` in PowerShell.
 
-- **React 18** - UI library
-- **Material UI (MUI)** - Component library
-- **Axios** - HTTP client
-- **React Scripts** - Build tools
-
-## 📦 Project Structure
-
-```
-QueenB/
-├── server/                 # Backend application
-│   ├── routes/            # API route handlers
-│   ├── index.js           # Server entry point
-│   ├── package.json       # Server dependencies
-│   └── .env.example       # Environment variables template
-├── client/                # Frontend application
-│   ├── public/            # Static files
-│   ├── src/
-│   │   ├── components/    # React components
-│   │   ├── App.js         # Main application component
-│   │   └── index.js       # React entry point
-│   └── package.json       # Client dependencies
-├── package.json           # Root package.json with scripts
-└── README.md              # This file
-```
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Node.js (version 14 or higher)
-- npm or yarn package manager
-
-### Installation
-
-1. **Fork the template repository to your own user**
-If you are working as a team, you can choose one member to fork the template repository to their own user, 
-and then share the repository with the rest of the team.
-
-
-2. **Clone or navigate to the project directory**
-
-   ```bash
-   git clone **copied git url**
-   ```
-
-   ```bash
-   cd QueenB
-   ```
-
-2. **Install root dependencies**
-
-   ```bash
-   npm install
-   ```
-
-3. **Install server and client dependencies**
-
-   ```bash
-   npm run install-all
-   ```
-
-   OR:
-
-   - open terminal and run:
-
-   ```bash
-   cd server
-   npm install
-   ```
-
-   - open another terminal
-
-   ```bash
-   cd client
-   npm install
-   ```
-
-4. **Set up environment variables**
-   ```bash
-   cd server
-   cp .env.example .env
-   # Edit .env file with your configuration if needed
-   cd ..
-   ```
-
-### Running the Application
-
-#### Development Mode (Recommended)
-
-#### Running Separately
-
-**Start the backend server:**
+1. Install MongoDB Community Server locally, or start Docker Desktop and run:
 
 ```bash
-npm run server
+docker compose up -d
 ```
 
-**Start the frontend client (in a new terminal):**
+2. Start MongoDB if you installed it without Docker.
+3. Install dependencies:
 
 ```bash
-npm run client
+npm.cmd install
+cd server
+npm.cmd install
+cd ../client
+npm.cmd install
 ```
 
-#### Running Concurrently
+4. Create `server/.env` from `server/.env.example`:
 
-Run both client and server concurrently:
+```env
+PORT=5000
+MONGO_URI=mongodb://127.0.0.1:27017/queenb-match
+JWT_SECRET=dev-secret-change-me
+ADMIN_EMAIL=admin@queenb.local
+ADMIN_PASSWORD=admin123
+ADMIN_USERNAME=מנהלת קהילה
+```
+
+You can also create `client/.env` from `client/.env.example`.
+
+5. Create the admin user:
 
 ```bash
-npm run dev
+cd server
+npm.cmd run seed:admin
 ```
 
-This will start:
+6. Run the app from the project root:
 
-- Backend server on http://localhost:5000
-- Frontend client on http://localhost:3000 - you can access the application in your browser at this URL.
+```bash
+npm.cmd run dev
+```
 
-### Building for Production
+Frontend: http://localhost:3000
 
-1. **Build the React client:**
+Backend: http://localhost:5000
 
-   ```bash
-   npm run build
-   ```
+## Demo Flow
 
-2. **Start the production server:**
-   ```bash
-   npm start
-   ```
+1. Register user A.
+2. User A creates a mentor profile.
+3. Register user B.
+4. User B opens the mentor list and requests a meeting with user A.
+5. User A opens the calendar as mentor and proposes times.
+6. User B opens the calendar as mentee and selects a time.
+7. The meeting appears in the calendar.
+8. Login as admin to see all users and meetings.
 
+## Helpful Terms
 
-
-### Health Check
-
-- `GET /api/health` - Server health check
-
-
-## 🔧 Development
-
-### Available Scripts
-
-- `npm run dev` - Run both client and server in development mode
-- `npm run server` - Run only the backend server
-- `npm run client` - Run only the frontend client
-- `npm run install-all` - Install dependencies for both client and server
-- `npm run build` - Build the React client for production
-- `npm start` - Start the production server
-
-### Key Features
-
-- **Responsive Design**: The application works on all device sizes
-- **Modern UI**: Material UI components provide a professional look
-- **Error Handling**: Comprehensive error handling on both frontend and backend
-- **Loading States**: User-friendly loading indicators
-- **Form Validation**: Client and server-side validation
-- **Success Feedback**: Clear success and error messages
-
-
-## 📝 License
-
-This project is licensed under the MIT License.
-
-## 🆘 Troubleshooting
-
-### Common Issues
-
-1. **Port already in use**: If ports 3000 or 5000 are in use, you can change them in the package.json scripts or .env file
-
-2. **Installation issues**: Delete `node_modules` folders and run `npm run install-all` again
-
-3. **API connection issues**: Ensure the backend server is running on port 5000 and the proxy is configured correctly in the client package.json
-
-### Support
-
-If you encounter any issues, please check the console logs for detailed error messages or create an issue in the repository.
-
----
-
-Built with ❤️ using React, Material UI, and Node.js
+- API: backend route the frontend calls, for example `/api/auth/login`.
+- Schema: the shape of a MongoDB document.
+- JWT: a login token kept by the browser after login.
+- Mongoose: a library that connects TypeScript/JavaScript code to MongoDB schemas.
