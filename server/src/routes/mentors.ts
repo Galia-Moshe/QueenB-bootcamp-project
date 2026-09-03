@@ -42,7 +42,7 @@ router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
 
 router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { background, topics, maxMeetings, meetingLength } = req.body;
+    const { background, topics, maxMeetings, meetingLength, jobTitle, company } = req.body;
 
     const mentorProfile = await MentorProfile.findOneAndUpdate(
       { userId: req.user!._id },
@@ -59,6 +59,12 @@ router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
         runValidators: true,
       }
     ).populate("userId", "-passwordHash");
+
+    if (jobTitle !== undefined || company !== undefined) {
+      req.user!.jobTitle = jobTitle || undefined;
+      req.user!.company = company || undefined;
+      await req.user!.save();
+    }
 
     return res.json({ mentorProfile, user: sanitizeUser(req.user!) });
   } catch (error) {

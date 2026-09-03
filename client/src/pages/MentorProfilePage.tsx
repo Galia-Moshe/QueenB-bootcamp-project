@@ -4,8 +4,10 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
+  FormControlLabel,
   Paper,
   Stack,
   TextField,
@@ -13,6 +15,7 @@ import {
 } from "@mui/material";
 import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import { api, getApiErrorMessage } from "../api";
+import { useAuth } from "../auth/AuthContext";
 import type { AppLayoutContext } from "../components/AppLayout";
 import MentorAvailabilityStep from "./MentorAvailabilityStep";
 import type { MentorProfile } from "../types";
@@ -59,9 +62,13 @@ const HELP_AREAS = [
 
 export default function MentorProfilePage() {
   const { refreshMentorProfile } = useOutletContext<AppLayoutContext>();
+  const { user, refreshUser } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<WizardStep>("details");
+  const [jobTitle, setJobTitle] = useState(user?.jobTitle || "");
+  const [company, setCompany] = useState(user?.company || "");
+  const [preferNotToSpecify, setPreferNotToSpecify] = useState(false);
   const [background, setBackground] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +91,14 @@ export default function MentorProfilePage() {
       .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleTogglePreferNotToSpecify = (checked: boolean) => {
+    setPreferNotToSpecify(checked);
+    if (checked) {
+      setJobTitle("");
+      setCompany("");
+    }
+  };
 
   const toggleTopic = (topic: string) => {
     const next = topics.includes(topic)
@@ -115,8 +130,11 @@ export default function MentorProfilePage() {
       await api.post("/mentors/me", {
         background,
         topics,
+        jobTitle,
+        company,
       });
       refreshMentorProfile();
+      await refreshUser();
       navigate("/");
     } catch (err) {
       setFinishError(getApiErrorMessage(err));
@@ -152,6 +170,47 @@ export default function MentorProfilePage() {
             <Stack spacing={2.5}>
               {loadError && <Alert severity="error">{loadError}</Alert>}
               {detailsError && <Alert severity="error">{detailsError}</Alert>}
+
+              <Box>
+                <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
+                      תפקיד (רשות)
+                    </Typography>
+                    <TextField
+                      value={jobTitle}
+                      onChange={(event) => setJobTitle(event.target.value)}
+                      placeholder="לדוגמה: VP Sales, Senior Backend Engineer"
+                      disabled={preferNotToSpecify}
+                      fullWidth
+                    />
+                  </Box>
+
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
+                      חברה (רשות)
+                    </Typography>
+                    <TextField
+                      value={company}
+                      onChange={(event) => setCompany(event.target.value)}
+                      placeholder="לדוגמה: Wiz, Monday"
+                      disabled={preferNotToSpecify}
+                      fullWidth
+                    />
+                  </Box>
+                </Stack>
+
+                <FormControlLabel
+                  sx={{ mt: 1 }}
+                  control={
+                    <Checkbox
+                      checked={preferNotToSpecify}
+                      onChange={(event) => handleTogglePreferNotToSpecify(event.target.checked)}
+                    />
+                  }
+                  label="מעדיפ/ה לא לציין"
+                />
+              </Box>
 
               <Box>
                 <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
