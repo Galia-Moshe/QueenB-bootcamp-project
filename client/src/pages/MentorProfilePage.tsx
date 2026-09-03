@@ -1,41 +1,74 @@
 import React, { FormEvent, useEffect, useState } from "react";
-import { useOutletContext } from "react-router-dom";
+import { useNavigate, useOutletContext } from "react-router-dom";
 import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import SaveIcon from "@mui/icons-material/Save";
+import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import { api, getApiErrorMessage } from "../api";
 import type { AppLayoutContext } from "../components/AppLayout";
+import MentorAvailabilityStep from "./MentorAvailabilityStep";
 import type { MentorProfile } from "../types";
 
-function listToText(items: string[] | undefined) {
-  return (items || []).join(", ");
-}
+type WizardStep = "details" | "availability";
 
-function textToList(value: string) {
-  return value
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
+const HELP_AREAS = [
+  "DevOps",
+  "Data",
+  "Cloud / Infrastructure",
+  "Backend Engineer",
+  "AI / Machine Learning",
+  "Product",
+  "Mobile (iOS / Android)",
+  "Full Stack",
+  "Front End",
+  "Embedded / Hardware",
+  "Business Development (BizDev)",
+  "Technical Writing",
+  "Security / Cyber",
+  "R&D / Research",
+  "Partnerships",
+  "Marketing",
+  "Growth / Acquisition",
+  "Business Operations (BizOps)",
+  "Solutions Engineering / Pre-Sales",
+  "Sales",
+  "Revenue Operations (RevOps)",
+  "Operations",
+  "IT",
+  "Design (UX/UI)",
+  "BI / Business Intelligence",
+  "Agile / Scrum Master",
+  "Customer Care",
+  "Community Management",
+  "Technical Project Manager",
+  "QA",
+  "אחר",
+  "Finance",
+  "HR",
+  "Technical Support",
+  "Customer Success",
+];
 
 export default function MentorProfilePage() {
   const { refreshMentorProfile } = useOutletContext<AppLayoutContext>();
+  const navigate = useNavigate();
+
+  const [step, setStep] = useState<WizardStep>("details");
   const [background, setBackground] = useState("");
-  const [topics, setTopics] = useState("");
-  const [maxMeetings, setMaxMeetings] = useState("");
-  const [meetingLength, setMeetingLength] = useState("");
+  const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [loadError, setLoadError] = useState("");
+  const [detailsError, setDetailsError] = useState("");
+  const [finishing, setFinishing] = useState(false);
+  const [finishError, setFinishError] = useState("");
 
   useEffect(() => {
     api
@@ -45,34 +78,50 @@ export default function MentorProfilePage() {
 
         if (profile) {
           setBackground(profile.background || "");
-          setTopics(listToText(profile.topics));
-          setMaxMeetings(profile.maxMeetings ? String(profile.maxMeetings) : "");
-          setMeetingLength(profile.meetingLength ? String(profile.meetingLength) : "");
+          setTopics(profile.topics || []);
         }
       })
-      .catch((err) => setError(getApiErrorMessage(err)))
+      .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
 
-  const handleSubmit = async (event: FormEvent) => {
+  const toggleTopic = (topic: string) => {
+    const next = topics.includes(topic)
+      ? topics.filter((item) => item !== topic)
+      : [...topics, topic];
+
+    setTopics(next);
+    if (next.length > 0) {
+      setDetailsError("");
+    }
+  };
+
+  const handleNext = (event: FormEvent) => {
     event.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess("");
+
+    if (topics.length === 0) {
+      setDetailsError("יש לבחור לפחות תחום אחד");
+      return;
+    }
+
+    setStep("availability");
+  };
+
+  const handleFinish = async () => {
+    setFinishing(true);
+    setFinishError("");
 
     try {
       await api.post("/mentors/me", {
         background,
-        topics: textToList(topics),
-        maxMeetings: maxMeetings ? Number(maxMeetings) : undefined,
-        meetingLength: meetingLength ? Number(meetingLength) : undefined,
+        topics,
       });
-      setSuccess("פרופיל המנטורית נשמר");
       refreshMentorProfile();
+      navigate("/");
     } catch (err) {
-      setError(getApiErrorMessage(err));
+      setFinishError(getApiErrorMessage(err));
     } finally {
-      setSaving(false);
+      setFinishing(false);
     }
   };
 
@@ -88,57 +137,78 @@ export default function MentorProfilePage() {
     <Stack spacing={3}>
       <Box>
         <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          הפרופיל שלי כמנטורית
+          הרשמה כמנטורית
         </Typography>
-        <Typography color="text.secondary">כאן את מגדירה במה תוכלי לעזור ובאיזה פורמט.</Typography>
+        <Typography color="text.secondary">
+          {step === "details"
+            ? "כאן את מגדירה במה תוכלי לעזור ובאיזה פורמט."
+            : "הגדירי מתי תהיי זמינה לפגישות (אפשר גם לדלג ולהגדיר בהמשך)."}
+        </Typography>
       </Box>
 
-      <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, maxWidth: 760 }}>
-        <Box component="form" onSubmit={handleSubmit}>
-          <Stack spacing={2.5}>
-            {error && <Alert severity="error">{error}</Alert>}
-            {success && <Alert severity="success">{success}</Alert>}
+      {step === "details" ? (
+        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, maxWidth: 760 }}>
+          <Box component="form" onSubmit={handleNext}>
+            <Stack spacing={2.5}>
+              {loadError && <Alert severity="error">{loadError}</Alert>}
+              {detailsError && <Alert severity="error">{detailsError}</Alert>}
 
-            <TextField
-              label="רקע מקצועי"
-              value={background}
-              onChange={(event) => setBackground(event.target.value)}
-              multiline
-              minRows={4}
-              fullWidth
-            />
+              <Box>
+                <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
+                  רקע קצר / ביו
+                </Typography>
+                <TextField
+                  value={background}
+                  onChange={(event) => setBackground(event.target.value)}
+                  placeholder="ספרי לי על עצמך..."
+                  multiline
+                  minRows={4}
+                  fullWidth
+                />
+              </Box>
 
-            <TextField
-              label="נושאים למנטורינג"
-              value={topics}
-              onChange={(event) => setTopics(event.target.value)}
-              helperText="הפרידי נושאים בפסיקים, למשל: ראיון מוק, קריירה, React"
-              fullWidth
-            />
+              <Box>
+                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                  תחומים לעזרה
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                  בחרי תחום אחד או יותר
+                </Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  {HELP_AREAS.map((area) => {
+                    const selected = topics.includes(area);
+                    return (
+                      <Chip
+                        key={area}
+                        label={
+                          <Box component="span" dir={area === "אחר" ? "rtl" : "ltr"}>
+                            {area}
+                          </Box>
+                        }
+                        clickable
+                        onClick={() => toggleTopic(area)}
+                        color={selected ? "primary" : "default"}
+                        variant={selected ? "filled" : "outlined"}
+                      />
+                    );
+                  })}
+                </Stack>
+              </Box>
 
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
-              <TextField
-                label="מספר פגישות מקסימלי"
-                type="number"
-                value={maxMeetings}
-                onChange={(event) => setMaxMeetings(event.target.value)}
-                fullWidth
-              />
-              <TextField
-                label="אורך פגישה בדקות"
-                type="number"
-                value={meetingLength}
-                onChange={(event) => setMeetingLength(event.target.value)}
-                fullWidth
-              />
+              <Button type="submit" variant="contained" endIcon={<NavigateNextIcon />}>
+                הבא
+              </Button>
             </Stack>
-
-            <Button type="submit" variant="contained" startIcon={<SaveIcon />} disabled={saving}>
-              שמירה
-            </Button>
-          </Stack>
-        </Box>
-      </Paper>
+          </Box>
+        </Paper>
+      ) : (
+        <MentorAvailabilityStep
+          onBack={() => setStep("details")}
+          onFinish={handleFinish}
+          finishing={finishing}
+          finishError={finishError}
+        />
+      )}
     </Stack>
   );
 }
