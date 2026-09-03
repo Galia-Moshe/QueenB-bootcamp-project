@@ -1,4 +1,5 @@
 import React, { FormEvent, useEffect, useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import {
   Alert,
   Box,
@@ -11,6 +12,7 @@ import {
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import { api, getApiErrorMessage } from "../api";
+import type { AppLayoutContext } from "../components/AppLayout";
 import type { MentorProfile } from "../types";
 
 function listToText(items: string[] | undefined) {
@@ -25,6 +27,7 @@ function textToList(value: string) {
 }
 
 export default function MentorProfilePage() {
+  const { refreshMentorProfile } = useOutletContext<AppLayoutContext>();
   const [background, setBackground] = useState("");
   const [topics, setTopics] = useState("");
   const [maxMeetings, setMaxMeetings] = useState("");
@@ -65,6 +68,7 @@ export default function MentorProfilePage() {
         meetingLength: meetingLength ? Number(meetingLength) : undefined,
       });
       setSuccess("פרופיל המנטורית נשמר");
+      refreshMentorProfile();
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
