@@ -50,11 +50,11 @@ const HELP_AREAS = [
   "Community Management",
   "Technical Project Manager",
   "QA",
-  "אחר",
   "Finance",
   "HR",
   "Technical Support",
   "Customer Success",
+  "אחר",
 ];
 
 export default function MentorProfilePage() {
