@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 import type { HydratedDocument } from "mongoose";
 import { User, type UserDocument } from "../models/User";
 
-type JwtPayload = {
+export type JwtPayload = {
   userId: string;
 };
 
@@ -38,7 +38,8 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   }
 }
 
-export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+/** Admin gate: requires `requireAuth` first so `req.user` is loaded from the DB. */
+export function isAdmin(req: AuthRequest, res: Response, next: NextFunction) {
   if (req.user?.role !== "admin") {
     return res.status(403).json({ error: "נדרשת הרשאת אדמין" });
   }
