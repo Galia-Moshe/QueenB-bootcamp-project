@@ -1,26 +1,14 @@
 import React, { FormEvent, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Container,
-  Paper,
-  Stack,
-  Tab,
-  Tabs,
-  TextField,
-  Typography,
-} from "@mui/material";
-import LoginIcon from "@mui/icons-material/Login";
-import PersonAddIcon from "@mui/icons-material/PersonAdd";
+import { Box, Container, Typography } from "@mui/material";
 import { getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
-
-type Mode = "login" | "register";
+import AuthFormCard, { AuthMode } from "../components/auth/AuthFormCard";
+import AuthInfoPanel from "../components/auth/AuthInfoPanel";
+import "./AuthPage.css";
 
 export default function AuthPage() {
   const { login, register } = useAuth();
-  const [mode, setMode] = useState<Mode>("login");
+  const [mode, setMode] = useState<AuthMode>("login");
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,7 +17,7 @@ export default function AuthPage() {
 
   const isRegister = mode === "register";
 
-  const handleSubmit = async (event: FormEvent) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
     setSubmitting(true);
@@ -48,71 +36,37 @@ export default function AuthPage() {
   };
 
   return (
-    <Box sx={{ minHeight: "100vh", bgcolor: "background.default", display: "grid", placeItems: "center" }}>
-      <Container maxWidth="sm">
-        <Paper elevation={2} sx={{ p: { xs: 3, sm: 4 }, borderRadius: 2 }}>
-          <Stack spacing={3}>
-            <Box>
-              <Typography variant="h4" sx={{ fontWeight: 800, color: "primary.main" }}>
-                QueenB Match
-              </Typography>
-              <Typography variant="body1" color="text.secondary">
-                התחברות למערכת המנטורינג של הקהילה
-              </Typography>
-            </Box>
+    <Box className="auth-page">
+      <Box component="header" className="auth-header">
+        <Container maxWidth="lg">
+          <Box className="auth-header-content">
+            <Typography variant="h4" component="h1" className="auth-header-title">
+              QueenB Match
+            </Typography>
+          </Box>
+        </Container>
+      </Box>
 
-            <Tabs value={mode} onChange={(_event, value: Mode) => setMode(value)}>
-              <Tab value="login" label="כניסה" icon={<LoginIcon />} iconPosition="start" />
-              <Tab value="register" label="הרשמה" icon={<PersonAddIcon />} iconPosition="start" />
-            </Tabs>
-
-            <Box component="form" onSubmit={handleSubmit}>
-              <Stack spacing={2.5}>
-                {error && <Alert severity="error">{error}</Alert>}
-
-                {isRegister && (
-                  <TextField
-                    label="שם משתמשת"
-                    value={username}
-                    onChange={(event) => setUsername(event.target.value)}
-                    required
-                    fullWidth
-                  />
-                )}
-
-                <TextField
-                  label="מייל"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                  fullWidth
-                />
-
-                <TextField
-                  label="סיסמה"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  fullWidth
-                  helperText={isRegister ? "לפחות 6 תווים" : undefined}
-                />
-
-                <Button
-                  type="submit"
-                  variant="contained"
-                  size="large"
-                  disabled={submitting}
-                  startIcon={isRegister ? <PersonAddIcon /> : <LoginIcon />}
-                >
-                  {isRegister ? "הרשמה" : "כניסה"}
-                </Button>
-              </Stack>
-            </Box>
-          </Stack>
-        </Paper>
-      </Container>
+      <Box component="main" className="auth-main">
+        <Container maxWidth="lg">
+          <Box className="auth-layout">
+            <AuthInfoPanel />
+            <AuthFormCard
+              mode={mode}
+              onModeChange={setMode}
+              username={username}
+              onUsernameChange={setUsername}
+              email={email}
+              onEmailChange={setEmail}
+              password={password}
+              onPasswordChange={setPassword}
+              error={error}
+              submitting={submitting}
+              onSubmit={handleSubmit}
+            />
+          </Box>
+        </Container>
+      </Box>
     </Box>
   );
 }
