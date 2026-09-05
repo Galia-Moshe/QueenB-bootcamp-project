@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link as RouterLink, Outlet, useLocation } from "react-router-dom";
 import {
   AppBar,
@@ -15,16 +15,38 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import SchoolIcon from "@mui/icons-material/School";
 import { useAuth } from "../auth/AuthContext";
+import { api } from "../api";
+import type { MentorProfile } from "../types";
 
-const navItems = [
-  { label: "יומן", path: "/", icon: <CalendarMonthIcon /> },
-  { label: "מנטוריות", path: "/mentors", icon: <SchoolIcon /> },
-  { label: "הפרופיל שלי כמנטורית", path: "/mentor-profile", icon: <PersonAddAlt1Icon /> },
-];
+export type AppLayoutContext = {
+  refreshMentorProfile: () => void;
+};
 
 export function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [mentorProfile, setMentorProfile] = useState<MentorProfile | null>(null);
+
+  const refreshMentorProfile = useCallback(() => {
+    api
+      .get<{ mentorProfile: MentorProfile | null }>("/mentors/me")
+      .then((response) => setMentorProfile(response.data.mentorProfile))
+      .catch(() => setMentorProfile(null));
+  }, []);
+
+  useEffect(() => {
+    refreshMentorProfile();
+  }, [refreshMentorProfile]);
+
+  const isMentor = Boolean(mentorProfile);
+
+  const navItems = [
+    { label: "יומן", path: "/", icon: <CalendarMonthIcon /> },
+    { label: "מנטוריות", path: "/mentors", icon: <SchoolIcon /> },
+    ...(isMentor
+      ? []
+      : [{ label: "הירשמי כמנטורית", path: "/mentor-profile", icon: <PersonAddAlt1Icon /> }]),
+  ];
 
   return (
     <Box sx={{ minHeight: "100vh", bgcolor: "background.default" }}>
@@ -69,7 +91,7 @@ export function AppLayout() {
       </AppBar>
 
       <Container maxWidth="xl" sx={{ py: 4 }}>
-        <Outlet />
+        <Outlet context={{ refreshMentorProfile } satisfies AppLayoutContext} />
       </Container>
     </Box>
   );
