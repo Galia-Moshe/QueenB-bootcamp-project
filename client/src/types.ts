@@ -30,6 +30,17 @@ export type MentorProfile = {
   updatedAt?: string;
 };
 
+export type AvailabilityWindow = {
+  _id: string;
+  mentorId: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  meetingLength: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type MeetingStatus =
   | "pending_mentor_times"
   | "pending_mentee_selection"
