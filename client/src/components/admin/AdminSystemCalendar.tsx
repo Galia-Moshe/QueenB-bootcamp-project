@@ -309,7 +309,7 @@ export function AdminSystemCalendar() {
                             flexWrap="wrap"
                           >
                             <Typography sx={{ fontWeight: 700 }}>
-                              {meeting.mentorId.username} ↔ {meeting.menteeId.username}
+                              {meeting.mentorId.username} & {meeting.menteeId.username}
                             </Typography>
                             <Chip
                               label={statusLabels[meeting.status]}
