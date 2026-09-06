@@ -5,18 +5,18 @@ import {
   Box,
   Button,
   Checkbox,
-  Chip,
   CircularProgress,
   FormControlLabel,
-  Paper,
   Stack,
   TextField,
   Typography,
 } from "@mui/material";
-import NavigateNextIcon from "@mui/icons-material/NavigateNext";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import type { AppLayoutContext } from "../components/AppLayout";
+import TopicSelector from "../components/mentor-profile/TopicSelector";
+import PageHero from "../components/ui/PageHero";
+import SurfaceCard from "../components/ui/SurfaceCard";
 import MentorAvailabilityStep from "./MentorAvailabilityStep";
 import type { MentorProfile } from "../types";
 
@@ -152,20 +152,18 @@ export default function MentorProfilePage() {
   }
 
   return (
-    <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          הרשמה כמנטורית
-        </Typography>
-        <Typography color="text.secondary">
-          {step === "details"
+    <Stack spacing={3} sx={{ width: "100%" }}>
+      <PageHero
+        title="הרשמה כמנטורית"
+        description={
+          step === "details"
             ? "כאן את מגדירה במה תוכלי לעזור ובאיזה פורמט."
-            : "הגדירי מתי תהיי זמינה לפגישות (אפשר גם לדלג ולהגדיר בהמשך)."}
-        </Typography>
-      </Box>
+            : "הגדירי מתי תהיי זמינה לפגישות (אפשר גם לדלג ולהגדיר בהמשך)."
+        }
+      />
 
       {step === "details" ? (
-        <Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 2, maxWidth: 760 }}>
+        <SurfaceCard centered sx={{ p: { xs: 2, md: 3 } }}>
           <Box component="form" onSubmit={handleNext}>
             <Stack spacing={2.5}>
               {loadError && <Alert severity="error">{loadError}</Alert>}
@@ -174,7 +172,7 @@ export default function MentorProfilePage() {
               <Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
                       תפקיד (רשות)
                     </Typography>
                     <TextField
@@ -187,7 +185,7 @@ export default function MentorProfilePage() {
                   </Box>
 
                   <Box sx={{ flex: 1 }}>
-                    <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
                       חברה (רשות)
                     </Typography>
                     <TextField
@@ -213,7 +211,7 @@ export default function MentorProfilePage() {
               </Box>
 
               <Box>
-                <Typography variant="subtitle2" sx={{ mb: 0.75, fontWeight: 700 }}>
+                <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
                   רקע קצר / ביו
                 </Typography>
                 <TextField
@@ -227,39 +225,24 @@ export default function MentorProfilePage() {
               </Box>
 
               <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                <Typography variant="subtitle2" sx={{ color: "primary.dark", fontWeight: 800 }}>
                   תחומים לעזרה
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                   בחרי תחום אחד או יותר
                 </Typography>
-                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                  {HELP_AREAS.map((area) => {
-                    const selected = topics.includes(area);
-                    return (
-                      <Chip
-                        key={area}
-                        label={
-                          <Box component="span" dir={area === "אחר" ? "rtl" : "ltr"}>
-                            {area}
-                          </Box>
-                        }
-                        clickable
-                        onClick={() => toggleTopic(area)}
-                        color={selected ? "primary" : "default"}
-                        variant={selected ? "filled" : "outlined"}
-                      />
-                    );
-                  })}
-                </Stack>
+                <TopicSelector options={HELP_AREAS} selectedTopics={topics} onToggle={toggleTopic} />
               </Box>
 
-              <Button type="submit" variant="contained" endIcon={<NavigateNextIcon />}>
+              <Button type="submit" variant="contained" dir="ltr">
+                <Box component="span" sx={{ direction: "ltr", unicodeBidi: "isolate" }}>
                 הבא
+                  {" >"}
+                </Box>
               </Button>
             </Stack>
           </Box>
-        </Paper>
+        </SurfaceCard>
       ) : (
         <MentorAvailabilityStep
           onBack={() => setStep("details")}

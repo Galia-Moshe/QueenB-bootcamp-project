@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { Box, Stack, Tab, Tabs, Typography } from "@mui/material";
+import { Stack, Tab, Tabs } from "@mui/material";
 import { AdminSystemCalendar } from "../components/admin/AdminSystemCalendar";
 import { AdminUsersView } from "../components/admin/AdminUsersView";
+import PageHero from "../components/ui/PageHero";
 
 type AdminTab = "calendar" | "users";
 
@@ -10,12 +11,7 @@ export default function AdminPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          ניהול קהילה
-        </Typography>
-        <Typography color="text.secondary">מעקב אחרי פגישות המערכת והמשתמשות.</Typography>
-      </Box>
+      <PageHero title="ניהול קהילה" description="מעקב אחרי פגישות המערכת והמשתמשות." />
 
       <Tabs
         value={activeTab}

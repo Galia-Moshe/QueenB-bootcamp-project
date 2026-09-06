@@ -12,7 +12,6 @@ import {
   CircularProgress,
   Divider,
   FormControlLabel,
-  Paper,
   Stack,
   Switch,
   TextField,
@@ -21,6 +20,8 @@ import {
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../api";
+import PageHero from "../components/ui/PageHero";
+import SurfaceCard from "../components/ui/SurfaceCard";
 import type { Meeting, MentorProfile } from "../types";
 import { statusLabels } from "../types";
 
@@ -85,10 +86,12 @@ function PendingMeetingCard({
   };
 
   return (
-    <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
+    <SurfaceCard variant="outlined" muted shadow={false}>
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-          <Typography sx={{ fontWeight: 700 }}>{otherParticipantName(meeting, role)}</Typography>
+          <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
+            {otherParticipantName(meeting, role)}
+          </Typography>
           <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
         </Stack>
 
@@ -152,7 +155,7 @@ function PendingMeetingCard({
           </Typography>
         )}
       </Stack>
-    </Paper>
+    </SurfaceCard>
   );
 }
 
@@ -194,7 +197,7 @@ export default function HomePage() {
           id: meeting._id,
           title: `${otherParticipantName(meeting, role)} - ${statusLabels[meeting.status]}`,
           start: meeting.selectedTime,
-          backgroundColor: meeting.status === "scheduled" ? "#146C94" : "#2E7D62",
+          backgroundColor: meeting.status === "scheduled" ? "#d81b60" : "#ad1457",
           borderColor: "transparent",
         })),
     [meetings, role]
@@ -205,33 +208,30 @@ export default function HomePage() {
 
   return (
     <Stack spacing={3}>
-      <Stack
-        direction={{ xs: "column", md: "row" }}
-        spacing={2}
-        alignItems={{ xs: "stretch", md: "center" }}
-        justifyContent="space-between"
-      >
-        <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800 }}>
-            היומן שלי
-          </Typography>
-          <Typography color="text.secondary">
-            פגישות שנקבעו מופיעות ביומן, ובקשות שעדיין מחכות לפעולה מופיעות בצד.
-          </Typography>
-        </Box>
-
-        {canSwitchRoles && (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={role === "mentor"}
-                onChange={(event) => setRole(event.target.checked ? "mentor" : "mentee")}
-              />
-            }
-            label={role === "mentor" ? "הפגישות שלי כמנטורית" : "הפגישות שלי כמנטית"}
-          />
-        )}
-      </Stack>
+      <PageHero
+        title="היומן שלי"
+        description="פגישות שנקבעו מופיעות ביומן, ובקשות שעדיין מחכות לפעולה מופיעות בצד."
+        action={
+          canSwitchRoles && (
+            <FormControlLabel
+              sx={{
+                mx: 0,
+                color: "#ffffff",
+                "& .MuiFormControlLabel-label": {
+                  fontWeight: 800,
+                },
+              }}
+              control={
+                <Switch
+                  checked={role === "mentor"}
+                  onChange={(event) => setRole(event.target.checked ? "mentor" : "mentee")}
+                />
+              }
+              label={role === "mentor" ? "הפגישות שלי כמנטורית" : "הפגישות שלי כמנטית"}
+            />
+          )
+        }
+      />
 
       {error && <Alert severity="error">{error}</Alert>}
 
@@ -241,7 +241,7 @@ export default function HomePage() {
         </Box>
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "2fr 1fr" }, gap: 3 }}>
-          <Paper sx={{ p: 2, borderRadius: 2, overflow: "hidden" }}>
+          <SurfaceCard sx={{ overflow: "hidden" }}>
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
@@ -261,12 +261,12 @@ export default function HomePage() {
               height="auto"
               events={scheduledEvents}
             />
-          </Paper>
+          </SurfaceCard>
 
-          <Paper sx={{ p: 2, borderRadius: 2 }}>
+          <SurfaceCard>
             <Stack spacing={2}>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>
+                <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
                   בקשות שמחכות לטיפול
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
@@ -289,7 +289,7 @@ export default function HomePage() {
                 ))
               )}
             </Stack>
-          </Paper>
+          </SurfaceCard>
         </Box>
       )}
     </Stack>
