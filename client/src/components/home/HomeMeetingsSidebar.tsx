@@ -1,7 +1,8 @@
 import React from "react";
 import { Box, Button, Divider, Stack, Typography } from "@mui/material";
 import SurfaceCard from "../ui/SurfaceCard";
-import type { AvailabilityWindow, Meeting } from "../../types";
+import { UserProfileLink } from "../UserProfileLink";
+import type { AvailabilityWindow, Meeting, User } from "../../types";
 import { meetingEventStart } from "../../utils/calendarUtils";
 
 type MeetingRole = "mentee" | "mentor";
@@ -27,8 +28,8 @@ function getAvailabilityWindow(meeting: Meeting): AvailabilityWindow | null {
     : null;
 }
 
-function otherParticipantName(meeting: Meeting, role: MeetingRole) {
-  return role === "mentor" ? meeting.menteeId.username : meeting.mentorId.username;
+function otherParticipant(meeting: Meeting, role: MeetingRole): User {
+  return role === "mentor" ? meeting.menteeId : meeting.mentorId;
 }
 
 function formatMeetingTime(meeting: Meeting) {
@@ -90,39 +91,46 @@ export function HomeMeetingsSidebar({
               <Typography color="text.secondary">אין פגישות מתוזמנות ביום זה.</Typography>
             ) : (
               <Stack spacing={1.25}>
-                {filteredEvents.map((meeting) => (
-                  <Box
-                    key={meeting._id}
-                    component="button"
-                    type="button"
-                    onClick={() => onEventClick(meeting)}
-                    sx={{
-                      display: "block",
-                      width: "100%",
-                      textAlign: "start",
-                      border: "1px solid #f8bbd0",
-                      borderRadius: 2,
-                      bgcolor: "#fff7fa",
-                      px: 1.75,
-                      py: 1.5,
-                      cursor: "pointer",
-                      transition: "background-color 0.15s ease, box-shadow 0.15s ease",
-                      font: "inherit",
-                      color: "inherit",
-                      "&:hover": {
-                        backgroundColor: "rgba(236, 64, 122, 0.1)",
-                        boxShadow: "0 8px 20px rgba(136, 14, 79, 0.08)",
-                      },
-                    }}
-                  >
-                    <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
-                      {otherParticipantName(meeting, role)}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-                      {formatMeetingTime(meeting)}
-                    </Typography>
-                  </Box>
-                ))}
+                {filteredEvents.map((meeting) => {
+                  const participant = otherParticipant(meeting, role);
+
+                  return (
+                    <Box
+                      key={meeting._id}
+                      component="button"
+                      type="button"
+                      onClick={() => onEventClick(meeting)}
+                      sx={{
+                        display: "block",
+                        width: "100%",
+                        textAlign: "start",
+                        border: "1px solid #f8bbd0",
+                        borderRadius: 2,
+                        bgcolor: "#fff7fa",
+                        px: 1.75,
+                        py: 1.5,
+                        cursor: "pointer",
+                        transition: "background-color 0.15s ease, box-shadow 0.15s ease",
+                        font: "inherit",
+                        color: "inherit",
+                        "&:hover": {
+                          backgroundColor: "rgba(236, 64, 122, 0.1)",
+                          boxShadow: "0 8px 20px rgba(136, 14, 79, 0.08)",
+                        },
+                      }}
+                    >
+                      <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
+                        <UserProfileLink
+                          userId={participant._id}
+                          userName={participant.username}
+                        />
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                        {formatMeetingTime(meeting)}
+                      </Typography>
+                    </Box>
+                  );
+                })}
               </Stack>
             )}
           </>

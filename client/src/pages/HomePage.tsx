@@ -22,7 +22,8 @@ import { HomeMeetingsSidebar } from "../components/home/HomeMeetingsSidebar";
 import { MeetingDetailsModal } from "../components/meetings/MeetingDetailsModal";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
-import type { AvailabilityWindow, Meeting, MentorProfile } from "../types";
+import { UserProfileLink } from "../components/UserProfileLink";
+import type { AvailabilityWindow, Meeting, MentorProfile, User } from "../types";
 import { statusLabels } from "../types";
 import { meetingEventStart } from "../utils/calendarUtils";
 
@@ -52,8 +53,8 @@ function getAvailabilityWindow(meeting: Meeting): AvailabilityWindow | null {
     : null;
 }
 
-function otherParticipantName(meeting: Meeting, role: MeetingRole) {
-  return role === "mentor" ? meeting.menteeId.username : meeting.mentorId.username;
+function otherParticipant(meeting: Meeting, role: MeetingRole): User {
+  return role === "mentor" ? meeting.menteeId : meeting.mentorId;
 }
 
 /** Align calendar dots and sidebar filters on the same date key. */
@@ -89,6 +90,7 @@ function PendingMeetingCard({
 
   const availabilityWindow = getAvailabilityWindow(meeting);
   const isNewFlowMentorView = role === "mentor" && Boolean(availabilityWindow);
+  const participant = otherParticipant(meeting, role);
 
   const canPropose =
     role === "mentor" && meeting.status === "pending_mentor_times" && !availabilityWindow;
@@ -169,7 +171,7 @@ function PendingMeetingCard({
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
           <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
-            {otherParticipantName(meeting, role)}
+            <UserProfileLink userId={participant._id} userName={participant.username} />
           </Typography>
           <Chip
             label={isNewFlowMentorView ? "ממתינה לאישור" : statusLabels[meeting.status]}
@@ -288,6 +290,7 @@ function ScheduledMeetingCard({
   const [canceling, setCanceling] = useState(false);
 
   const availabilityWindow = getAvailabilityWindow(meeting);
+  const participant = otherParticipant(meeting, role);
 
   const cancelMeeting = async () => {
     if (canceling) return;
@@ -314,7 +317,7 @@ function ScheduledMeetingCard({
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
           <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
-            {otherParticipantName(meeting, role)}
+            <UserProfileLink userId={participant._id} userName={participant.username} />
           </Typography>
           <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
         </Stack>
