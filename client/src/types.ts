@@ -26,8 +26,16 @@ export type MentorProfile = {
   topics: string[];
   maxMeetings?: number;
   meetingLength?: number;
+  hasAvailability?: boolean;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type MentorsPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
 };
 
 export type AvailabilityWindowStatus = "available" | "pending" | "booked";

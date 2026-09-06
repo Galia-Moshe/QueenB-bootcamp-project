@@ -2,6 +2,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { MentorProfile } from "../models/MentorProfile";
+import { listMentors } from "../controllers/mentorsController";
 import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { normalizeStringList, sanitizeUser } from "../utils/users";
@@ -21,17 +22,7 @@ function toMinutes(time: string) {
   return hours * 60 + minutes;
 }
 
-router.get("/", requireAuth, async (_req, res, next) => {
-  try {
-    const mentorProfiles = await MentorProfile.find()
-      .populate("userId", "-passwordHash")
-      .sort({ updatedAt: -1 });
-
-    return res.json({ mentors: mentorProfiles });
-  } catch (error) {
-    next(error);
-  }
-});
+router.get("/", requireAuth, listMentors);
 
 router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
