@@ -8,6 +8,7 @@ import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import MentorProfilePage from "./pages/MentorProfilePage";
 import MentorsPage from "./pages/MentorsPage";
+import ProfilePage from "./pages/ProfilePage";
 import theme from "./theme";
 
 function ProtectedApp() {
@@ -31,6 +32,7 @@ function ProtectedApp() {
         <Route path="/" element={<HomePage />} />
         <Route path="/mentors" element={<MentorsPage />} />
         <Route path="/mentor-profile" element={<MentorProfilePage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route
           path="/admin"
           element={user.role === "admin" ? <AdminPage /> : <Navigate to="/" replace />}
