@@ -7,7 +7,6 @@ import {
   FormControl,
   InputLabel,
   MenuItem,
-  Paper,
   Select,
   Stack,
   Table,
@@ -18,6 +17,8 @@ import {
   Typography,
 } from "@mui/material";
 import { api, getApiErrorMessage } from "../api";
+import PageHero from "../components/ui/PageHero";
+import SurfaceCard from "../components/ui/SurfaceCard";
 import type { Meeting, MeetingStatus, User } from "../types";
 import { statusLabels } from "../types";
 
@@ -84,16 +85,11 @@ export default function AdminPage() {
 
   return (
     <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          ניהול קהילה
-        </Typography>
-        <Typography color="text.secondary">מעקב אחרי משתמשות ופגישות.</Typography>
-      </Box>
+      <PageHero title="ניהול קהילה" description="מעקב אחרי משתמשות ופגישות." />
 
       {error && <Alert severity="error">{error}</Alert>}
 
-      <Paper sx={{ p: 2, borderRadius: 2 }}>
+      <SurfaceCard>
         <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
           <FormControl sx={{ minWidth: 220 }}>
             <InputLabel id="status-filter-label">סטטוס</InputLabel>
@@ -128,7 +124,7 @@ export default function AdminPage() {
             </Select>
           </FormControl>
         </Stack>
-      </Paper>
+      </SurfaceCard>
 
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 240 }}>
@@ -136,12 +132,12 @@ export default function AdminPage() {
         </Box>
       ) : (
         <Stack spacing={3}>
-          <Paper sx={{ p: 2, borderRadius: 2, overflowX: "auto" }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 800 }}>
+          <SurfaceCard sx={{ overflowX: "auto" }}>
+            <Typography variant="h6" sx={{ mb: 2, color: "primary.dark", fontWeight: 900 }}>
               פגישות
             </Typography>
             <Table size="small">
-              <TableHead>
+              <TableHead sx={{ backgroundColor: "#fff7fa" }}>
                 <TableRow>
                   <TableCell>מנטורית</TableCell>
                   <TableCell>מנטית</TableCell>
@@ -169,14 +165,14 @@ export default function AdminPage() {
                 )}
               </TableBody>
             </Table>
-          </Paper>
+          </SurfaceCard>
 
-          <Paper sx={{ p: 2, borderRadius: 2, overflowX: "auto" }}>
-            <Typography variant="h6" sx={{ mb: 2, fontWeight: 800 }}>
+          <SurfaceCard sx={{ overflowX: "auto" }}>
+            <Typography variant="h6" sx={{ mb: 2, color: "primary.dark", fontWeight: 900 }}>
               משתמשות
             </Typography>
             <Table size="small">
-              <TableHead>
+              <TableHead sx={{ backgroundColor: "#fff7fa" }}>
                 <TableRow>
                   <TableCell>שם</TableCell>
                   <TableCell>מייל</TableCell>
@@ -197,7 +193,7 @@ export default function AdminPage() {
                 ))}
               </TableBody>
             </Table>
-          </Paper>
+          </SurfaceCard>
         </Stack>
       )}
     </Stack>

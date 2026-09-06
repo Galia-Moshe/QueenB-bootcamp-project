@@ -1,18 +1,17 @@
 import React, { useEffect, useState } from "react";
 import {
   Alert,
-  Avatar,
   Box,
-  Button,
-  Chip,
   CircularProgress,
-  Paper,
   Stack,
   Typography,
 } from "@mui/material";
-import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import MentorCard from "../components/mentors/MentorCard";
+import CenteredContent from "../components/ui/CenteredContent";
+import PageHero from "../components/ui/PageHero";
+import SurfaceCard from "../components/ui/SurfaceCard";
 import type { MentorProfile, User } from "../types";
 
 function getMentorUser(profile: MentorProfile) {
@@ -61,13 +60,8 @@ export default function MentorsPage() {
   };
 
   return (
-    <Stack spacing={3}>
-      <Box>
-        <Typography variant="h4" sx={{ fontWeight: 800 }}>
-          מנטוריות
-        </Typography>
-        <Typography color="text.secondary">בחרי מנטורית ושלחי בקשה לפגישה.</Typography>
-      </Box>
+    <Stack spacing={3} sx={{ width: "100%" }}>
+      <PageHero title="מנטוריות" description="בחרי מנטורית ושלחי בקשה לפגישה." />
 
       {error && <Alert severity="error">{error}</Alert>}
       {success && <Alert severity="success">{success}</Alert>}
@@ -77,55 +71,36 @@ export default function MentorsPage() {
           <CircularProgress />
         </Box>
       ) : mentors.length === 0 ? (
-        <Paper sx={{ p: 3, borderRadius: 2 }}>
+        <SurfaceCard centered sx={{ p: 3 }}>
           <Typography color="text.secondary">עדיין אין מנטוריות פעילות.</Typography>
-        </Paper>
+        </SurfaceCard>
       ) : (
-        <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(2, 1fr)" }, gap: 2 }}>
+        <CenteredContent
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              sm: "repeat(auto-fit, minmax(min(100%, 340px), 1fr))",
+            },
+            gap: 2.5,
+          }}
+        >
           {mentors.map((profile) => {
             const mentor = getMentorUser(profile);
             const isCurrentUser = mentor?._id === user?._id;
 
             return (
-              <Paper key={profile._id} sx={{ p: 2.5, borderRadius: 2 }}>
-                <Stack spacing={2}>
-                  <Stack direction="row" spacing={2} alignItems="center">
-                    <Avatar src={mentor?.profilePicture} sx={{ width: 56, height: 56 }}>
-                      {mentor?.username?.[0]}
-                    </Avatar>
-                    <Box>
-                      <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                        {mentor?.username}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {[mentor?.jobTitle, mentor?.company].filter(Boolean).join(" · ") || "מנטורית בקהילה"}
-                      </Typography>
-                    </Box>
-                  </Stack>
-
-                  <Typography>{profile.background || "לא נוסף רקע עדיין."}</Typography>
-
-                  <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                    {profile.topics.map((topic) => (
-                      <Chip key={topic} label={topic} size="small" />
-                    ))}
-                    {profile.meetingLength && <Chip label={`${profile.meetingLength} דקות`} size="small" />}
-                    {profile.maxMeetings && <Chip label={`עד ${profile.maxMeetings} פגישות`} size="small" />}
-                  </Stack>
-
-                  <Button
-                    variant="contained"
-                    startIcon={<CalendarMonthIcon />}
-                    disabled={!mentor || isCurrentUser || requestingId === mentor?._id}
-                    onClick={() => mentor && requestMeeting(mentor)}
-                  >
-                    {isCurrentUser ? "זו את" : "בקשת פגישה"}
-                  </Button>
-                </Stack>
-              </Paper>
+              <MentorCard
+                key={profile._id}
+                profile={profile}
+                mentor={mentor}
+                isCurrentUser={isCurrentUser}
+                requesting={requestingId === mentor?._id}
+                onRequestMeeting={requestMeeting}
+              />
             );
           })}
-        </Box>
+        </CenteredContent>
       )}
     </Stack>
   );

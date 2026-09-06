@@ -15,7 +15,6 @@ import {
   DialogTitle,
   IconButton,
   MenuItem,
-  Paper,
   Stack,
   TextField,
   Typography,
@@ -24,6 +23,7 @@ import AddIcon from "@mui/icons-material/Add";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import { api, getApiErrorMessage } from "../api";
+import SurfaceCard from "../components/ui/SurfaceCard";
 import type { AvailabilityWindow } from "../types";
 
 const TIME_OPTIONS = Array.from({ length: 36 }, (_, index) => {
@@ -97,7 +97,7 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
         allDay: true,
         display: "block" as const,
         title: list.length === 1 ? "חלון זמין אחד" : `${list.length} חלונות זמינים`,
-        backgroundColor: "#146C94",
+        backgroundColor: "#d81b60",
         borderColor: "transparent",
       })),
     [windowsByDate]
@@ -205,17 +205,15 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
           <CircularProgress />
         </Box>
       ) : (
-        <Paper
+        <SurfaceCard
           sx={{
-            p: 2,
-            borderRadius: 2,
             overflow: "hidden",
             "& .fc-daygrid-day-frame": {
               cursor: "pointer",
               transition: "background-color 0.15s ease",
             },
             "& .fc-daygrid-day-frame:hover": {
-              backgroundColor: "rgba(20, 108, 148, 0.08)",
+              backgroundColor: "rgba(236, 64, 122, 0.08)",
             },
             "& .fc-event": {
               cursor: "pointer",
@@ -241,7 +239,7 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
             dateClick={(arg: DateClickArg) => openDay(arg.dateStr)}
             eventClick={(arg: EventClickArg) => openDay(arg.event.startStr)}
           />
-        </Paper>
+        </SurfaceCard>
       )}
 
       <Stack direction="row" spacing={2} justifyContent="space-between">
@@ -253,7 +251,19 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
         </Button>
       </Stack>
 
-      <Dialog open={Boolean(selectedDate)} onClose={closeDialog} fullWidth maxWidth="xs">
+      <Dialog
+        open={Boolean(selectedDate)}
+        onClose={closeDialog}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{
+          sx: {
+            border: "1px solid #f8bbd0",
+            borderRadius: 2,
+            boxShadow: "0 18px 48px rgba(136, 14, 79, 0.16)",
+          },
+        }}
+      >
         <DialogTitle>{selectedDate && formatDayLabel(selectedDate)}</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ mt: 1 }}>
@@ -262,9 +272,11 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
             {dayWindows.length > 0 && (
               <Stack spacing={1}>
                 {dayWindows.map((window) => (
-                  <Paper
+                  <SurfaceCard
                     key={window._id}
                     variant="outlined"
+                    muted
+                    shadow={false}
                     sx={{
                       p: 1.5,
                       display: "flex",
@@ -283,7 +295,7 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
                         <DeleteIcon fontSize="small" />
                       </IconButton>
                     </Stack>
-                  </Paper>
+                  </SurfaceCard>
                 ))}
               </Stack>
             )}

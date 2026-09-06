@@ -1,0 +1,54 @@
+.fc {
+  font-family: Assistant, Rubik, Arial, sans-serif;
+}
+
+.fc .fc-toolbar {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.fc .fc-toolbar-title {
+  color: #ad1457;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.fc .fc-button {
+  border-radius: 8px;
+  background: #d81b60;
+  border-color: #d81b60;
+  box-shadow: none;
+  font-family: Assistant, Rubik, Arial, sans-serif;
+  font-weight: 800;
+}
+
+.fc .fc-button:hover,
+.fc .fc-button:focus {
+  background: #ad1457;
+  border-color: #ad1457;
+  box-shadow: none;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  background: #ad1457;
+  border-color: #ad1457;
+}
+
+.fc-theme-standard td,
+.fc-theme-standard th,
+.fc-theme-standard .fc-scrollgrid {
+  border-color: #f8bbd0;
+}
+
+.fc .fc-col-header-cell-cushion,
+.fc .fc-daygrid-day-number {
+  color: #ad1457;
+  font-weight: 800;
+}
+
+.fc .fc-event {
+  border-radius: 6px;
+  padding: 2px 4px;
+  font-weight: 700;
+}
