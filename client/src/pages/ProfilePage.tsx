@@ -323,8 +323,17 @@ function MeetingCancellationCard({
   );
 }
 
-function MeetingsCancellationPanel({ isMentor }: { isMentor: boolean }) {
-  const [meetingRole, setMeetingRole] = useState<MeetingRole>("mentee");
+type MeetingsCancellationPanelProps = {
+  isMentor: boolean;
+  meetingRole: MeetingRole;
+  onMeetingRoleChange: (role: MeetingRole) => void;
+};
+
+function MeetingsCancellationPanel({
+  isMentor,
+  meetingRole,
+  onMeetingRoleChange,
+}: MeetingsCancellationPanelProps) {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -351,12 +360,12 @@ function MeetingsCancellationPanel({ isMentor }: { isMentor: boolean }) {
 
   useEffect(() => {
     if (!canSwitchRoles && meetingRole !== "mentee") {
-      setMeetingRole("mentee");
+      onMeetingRoleChange("mentee");
       return;
     }
 
     loadMeetings(effectiveRole);
-  }, [canSwitchRoles, effectiveRole, loadMeetings, meetingRole]);
+  }, [canSwitchRoles, effectiveRole, loadMeetings, meetingRole, onMeetingRoleChange]);
 
   return (
     <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
@@ -378,7 +387,7 @@ function MeetingsCancellationPanel({ isMentor }: { isMentor: boolean }) {
             value={meetingRole}
             onChange={(_event, nextRole: MeetingRole | null) => {
               if (nextRole) {
-                setMeetingRole(nextRole);
+                onMeetingRoleChange(nextRole);
               }
             }}
             sx={{
@@ -452,6 +461,7 @@ export default function ProfilePage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [selectedMeetingRole, setSelectedMeetingRole] = useState<MeetingRole>("mentee");
   const [editingSection, setEditingSection] = useState<SectionKey | null>(null);
   const [savingSection, setSavingSection] = useState<SectionKey | null>(null);
   const [sectionErrors, setSectionErrors] = useState<Partial<Record<SectionKey, string>>>({});
@@ -460,6 +470,7 @@ export default function ProfilePage() {
   const [loadError, setLoadError] = useState("");
 
   const isMentor = Boolean(mentorProfile);
+  const activeProfileRole = isMentor ? selectedMeetingRole : "mentee";
   const avatarSrc = profilePicturePreview || profilePicture || undefined;
 
   const setFormValue = (field: keyof ProfileForm, value: string) => {
@@ -491,12 +502,12 @@ export default function ProfilePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const clearSectionMessages = (section: SectionKey) => {
+  const clearSectionMessages = useCallback((section: SectionKey) => {
     setSectionErrors((prev) => ({ ...prev, [section]: "" }));
     setSectionSuccess((prev) => ({ ...prev, [section]: "" }));
-  };
+  }, []);
 
-  const resetSection = (section: SectionKey) => {
+  const resetSection = useCallback((section: SectionKey) => {
     if (!profileUser) {
       return;
     }
@@ -550,7 +561,27 @@ export default function ProfilePage() {
       setTechStack(profileUser.techStack || []);
       setTopics(mentorProfile?.topics || []);
     }
-  };
+  }, [menteeProfile, mentorProfile, profileUser]);
+
+  useEffect(() => {
+    if (!isMentor && selectedMeetingRole !== "mentee") {
+      setSelectedMeetingRole("mentee");
+    }
+  }, [isMentor, selectedMeetingRole]);
+
+  useEffect(() => {
+    if (editingSection !== "mentor" && editingSection !== "mentee") {
+      return;
+    }
+
+    if (editingSection === activeProfileRole) {
+      return;
+    }
+
+    resetSection(editingSection);
+    clearSectionMessages(editingSection);
+    setEditingSection(null);
+  }, [activeProfileRole, clearSectionMessages, editingSection, resetSection]);
 
   const beginEdit = (section: SectionKey) => {
     resetSection(section);
@@ -781,7 +812,11 @@ export default function ProfilePage() {
         }}
       >
         <Box sx={{ gridColumn: { xs: "auto", lg: 2 }, gridRow: { xs: "auto", lg: 1 } }}>
-          <MeetingsCancellationPanel isMentor={isMentor} />
+          <MeetingsCancellationPanel
+            isMentor={isMentor}
+            meetingRole={selectedMeetingRole}
+            onMeetingRoleChange={setSelectedMeetingRole}
+          />
         </Box>
 
         <SurfaceCard
@@ -969,7 +1004,7 @@ export default function ProfilePage() {
             </Stack>
           </Box>
 
-          {isMentor && (
+          {isMentor && activeProfileRole === "mentor" && (
             <>
               <Divider />
 
@@ -1101,109 +1136,113 @@ export default function ProfilePage() {
             </>
           )}
 
-          <Divider />
+          {activeProfileRole === "mentee" && (
+            <>
+              <Divider />
 
-          <Box component="section">
-            <Stack spacing={2.5}>
-              <SectionHeader
-                title="פרטי מנטית"
-                editing={editingSection === "mentee"}
-                saving={savingSection === "mentee"}
-                editDisabled={Boolean(editingSection)}
-                onEdit={() => beginEdit("mentee")}
-                onCancel={() => cancelEdit("mentee")}
-                onSave={saveMenteeSection}
-              />
-
-              {sectionErrors.mentee && <Alert severity="error">{sectionErrors.mentee}</Alert>}
-              {sectionSuccess.mentee && <Alert severity="success">{sectionSuccess.mentee}</Alert>}
-
-              {editingSection === "mentee" ? (
+              <Box component="section">
                 <Stack spacing={2.5}>
-                  <TextField
-                    label="כמה מילים עליי"
-                    value={form.menteeAbout}
-                    onChange={(event) => setFormValue("menteeAbout", event.target.value)}
-                    multiline
-                    minRows={3}
-                    fullWidth
+                  <SectionHeader
+                    title="פרטי מנטית"
+                    editing={editingSection === "mentee"}
+                    saving={savingSection === "mentee"}
+                    editDisabled={Boolean(editingSection)}
+                    onEdit={() => beginEdit("mentee")}
+                    onCancel={() => cancelEdit("mentee")}
+                    onSave={saveMenteeSection}
                   />
 
-                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
-                    <TextField
-                      label="רמת ניסיון"
-                      value={form.menteeExperienceLevel}
-                      onChange={(event) => setFormValue("menteeExperienceLevel", event.target.value)}
-                      placeholder="מתחילה, שנה ניסיון, אחרי קורס..."
-                      fullWidth
-                    />
-                    <TextField
-                      label="מטרות ללמידה"
-                      value={form.menteeGoals}
-                      onChange={(event) => setFormValue("menteeGoals", event.target.value)}
-                      placeholder="מה תרצי לחזק בפגישות"
-                      fullWidth
-                    />
-                  </Stack>
+                  {sectionErrors.mentee && <Alert severity="error">{sectionErrors.mentee}</Alert>}
+                  {sectionSuccess.mentee && <Alert severity="success">{sectionSuccess.mentee}</Alert>}
 
-                  <StringListEditor
-                    label="Skills בתור מנטית"
-                    value={menteeSkills}
-                    onChange={setMenteeSkills}
-                    placeholder="JavaScript, Python..."
-                  />
+                  {editingSection === "mentee" ? (
+                    <Stack spacing={2.5}>
+                      <TextField
+                        label="כמה מילים עליי"
+                        value={form.menteeAbout}
+                        onChange={(event) => setFormValue("menteeAbout", event.target.value)}
+                        multiline
+                        minRows={3}
+                        fullWidth
+                      />
 
-                  <StringListEditor
-                    label="טכנולוגיות שאני מכירה"
-                    value={menteeTechStack}
-                    onChange={setMenteeTechStack}
-                    placeholder="React, Node.js..."
-                  />
+                      <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                        <TextField
+                          label="רמת ניסיון"
+                          value={form.menteeExperienceLevel}
+                          onChange={(event) => setFormValue("menteeExperienceLevel", event.target.value)}
+                          placeholder="מתחילה, שנה ניסיון, אחרי קורס..."
+                          fullWidth
+                        />
+                        <TextField
+                          label="מטרות ללמידה"
+                          value={form.menteeGoals}
+                          onChange={(event) => setFormValue("menteeGoals", event.target.value)}
+                          placeholder="מה תרצי לחזק בפגישות"
+                          fullWidth
+                        />
+                      </Stack>
 
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 1.5, color: "primary.dark", fontWeight: 800 }}>
-                      תחומים שבהם אני רוצה עזרה
-                    </Typography>
-                    <TopicSelector
-                      options={MENTOR_TOPIC_OPTIONS}
-                      selectedTopics={helpTopics}
-                      onToggle={toggleHelpTopic}
-                    />
-                  </Box>
+                      <StringListEditor
+                        label="Skills בתור מנטית"
+                        value={menteeSkills}
+                        onChange={setMenteeSkills}
+                        placeholder="JavaScript, Python..."
+                      />
+
+                      <StringListEditor
+                        label="טכנולוגיות שאני מכירה"
+                        value={menteeTechStack}
+                        onChange={setMenteeTechStack}
+                        placeholder="React, Node.js..."
+                      />
+
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 1.5, color: "primary.dark", fontWeight: 800 }}>
+                          תחומים שבהם אני רוצה עזרה
+                        </Typography>
+                        <TopicSelector
+                          options={MENTOR_TOPIC_OPTIONS}
+                          selectedTopics={helpTopics}
+                          onToggle={toggleHelpTopic}
+                        />
+                      </Box>
+                    </Stack>
+                  ) : (
+                    <Stack spacing={2}>
+                      <DetailGrid>
+                        <DetailItem label="רמת ניסיון" value={form.menteeExperienceLevel} />
+                        <DetailItem label="מטרות ללמידה" value={form.menteeGoals} />
+                      </DetailGrid>
+
+                      <DetailItem label="כמה מילים עליי" value={form.menteeAbout} />
+
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
+                          Skills בתור מנטית
+                        </Typography>
+                        <ChipList items={menteeSkills} />
+                      </Box>
+
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
+                          טכנולוגיות שאני מכירה
+                        </Typography>
+                        <ChipList items={menteeTechStack} />
+                      </Box>
+
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
+                          תחומים שבהם אני רוצה עזרה
+                        </Typography>
+                        <ChipList items={helpTopics} />
+                      </Box>
+                    </Stack>
+                  )}
                 </Stack>
-              ) : (
-                <Stack spacing={2}>
-                  <DetailGrid>
-                    <DetailItem label="רמת ניסיון" value={form.menteeExperienceLevel} />
-                    <DetailItem label="מטרות ללמידה" value={form.menteeGoals} />
-                  </DetailGrid>
-
-                  <DetailItem label="כמה מילים עליי" value={form.menteeAbout} />
-
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
-                      Skills בתור מנטית
-                    </Typography>
-                    <ChipList items={menteeSkills} />
-                  </Box>
-
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
-                      טכנולוגיות שאני מכירה
-                    </Typography>
-                    <ChipList items={menteeTechStack} />
-                  </Box>
-
-                  <Box>
-                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
-                      תחומים שבהם אני רוצה עזרה
-                    </Typography>
-                    <ChipList items={helpTopics} />
-                  </Box>
-                </Stack>
-              )}
-            </Stack>
-          </Box>
+              </Box>
+            </>
+          )}
           </Stack>
         </SurfaceCard>
       </Box>
