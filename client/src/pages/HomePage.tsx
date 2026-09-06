@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import FullCalendar from "@fullcalendar/react";
+import type { DateClickArg } from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -39,6 +40,12 @@ function formatDateTime(value: string) {
 function formatWindowDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-");
   return `${day}/${month}/${year}`;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
 }
 
 function getAvailabilityWindow(meeting: Meeting): AvailabilityWindow | null {
@@ -335,6 +342,7 @@ export default function HomePage() {
   const [actionMessage, setActionMessage] = useState<{ text: string; severity: "success" | "error" } | null>(
     null
   );
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const loadMeetings = useCallback(async (meetingRole: MeetingRole) => {
     setError("");
@@ -365,20 +373,37 @@ export default function HomePage() {
 
   useEffect(() => {
     setActionMessage(null);
+    setSelectedDate(null);
     loadMeetings(role);
   }, [role, loadMeetings]);
 
   const scheduledEvents = useMemo(
     () =>
       meetings
-        .filter((meeting) => Boolean(meeting.selectedTime))
-        .map((meeting) => ({
-          id: meeting._id,
-          title: `${otherParticipantName(meeting, role)} - ${statusLabels[meeting.status]}`,
-          start: meeting.selectedTime,
-          backgroundColor: meeting.status === "scheduled" ? "#d81b60" : "#ad1457",
-          borderColor: "transparent",
-        })),
+        .filter((meeting) => meeting.status === "scheduled")
+        .map((meeting) => {
+          const availabilityWindow = getAvailabilityWindow(meeting);
+          const participantName = otherParticipantName(meeting, role);
+
+          if (availabilityWindow) {
+            return {
+              id: meeting._id,
+              title: `${availabilityWindow.startTime}–${availabilityWindow.endTime} פגישה עם ${participantName}`,
+              start: `${availabilityWindow.date}T${availabilityWindow.startTime}:00`,
+              end: `${availabilityWindow.date}T${availabilityWindow.endTime}:00`,
+              backgroundColor: "#d81b60",
+              borderColor: "transparent",
+            };
+          }
+
+          return {
+            id: meeting._id,
+            title: `פגישה עם ${participantName}`,
+            start: meeting.selectedTime,
+            backgroundColor: "#d81b60",
+            borderColor: "transparent",
+          };
+        }),
     [meetings, role]
   );
 
@@ -389,6 +414,10 @@ export default function HomePage() {
   const scheduledMeetingsList = meetings.filter(
     (meeting) => meeting.status === "scheduled" && Boolean(getAvailabilityWindow(meeting))
   );
+
+  const selectedDayMeetings = selectedDate
+    ? scheduledMeetingsList.filter((meeting) => getAvailabilityWindow(meeting)?.date === selectedDate)
+    : [];
 
   const canSwitchRoles = Boolean(mentorProfile);
 
@@ -447,6 +476,8 @@ export default function HomePage() {
               direction="rtl"
               height="auto"
               events={scheduledEvents}
+              displayEventTime={false}
+              dateClick={(arg: DateClickArg) => setSelectedDate(toDateKey(arg.date))}
             />
           </SurfaceCard>
 
@@ -476,25 +507,58 @@ export default function HomePage() {
                 ))
               )}
 
-              {scheduledMeetingsList.length > 0 && (
+              {(selectedDate || scheduledMeetingsList.length > 0) && (
                 <>
                   <Divider />
-                  <Box>
-                    <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-                      הפגישות המתוזמנות שלי
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
-                    </Typography>
-                  </Box>
-                  {scheduledMeetingsList.map((meeting) => (
-                    <ScheduledMeetingCard
-                      key={meeting._id}
-                      meeting={meeting}
-                      role={role}
-                      onChanged={handleMeetingChanged}
-                    />
-                  ))}
+                  {selectedDate ? (
+                    <>
+                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                        <Box>
+                          <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                            הפגישות ב־{formatWindowDate(selectedDate)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
+                          </Typography>
+                        </Box>
+                        <Button size="small" onClick={() => setSelectedDate(null)}>
+                          הצג את כל הפגישות
+                        </Button>
+                      </Stack>
+
+                      {selectedDayMeetings.length === 0 ? (
+                        <Typography color="text.secondary">אין פגישות מתוזמנות ביום זה.</Typography>
+                      ) : (
+                        selectedDayMeetings.map((meeting) => (
+                          <ScheduledMeetingCard
+                            key={meeting._id}
+                            meeting={meeting}
+                            role={role}
+                            onChanged={handleMeetingChanged}
+                          />
+                        ))
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Box>
+                        <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                          הפגישות המתוזמנות שלי
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
+                        </Typography>
+                      </Box>
+                      {scheduledMeetingsList.map((meeting) => (
+                        <ScheduledMeetingCard
+                          key={meeting._id}
+                          meeting={meeting}
+                          role={role}
+                          onChanged={handleMeetingChanged}
+                        />
+                      ))}
+                    </>
+                  )}
                 </>
               )}
             </Stack>

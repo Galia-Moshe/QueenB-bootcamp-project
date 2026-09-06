@@ -87,8 +87,8 @@ export type NotificationItem = {
 };
 
 export const statusLabels: Record<MeetingStatus, string> = {
-  pending_mentor_times: "ממתינה להצעת זמנים",
-  pending_mentee_selection: "ממתינה לבחירת זמן",
+  pending_mentor_times: "ממתינה לאישור",
+  pending_mentee_selection: "ממתינה לאישור",
   scheduled: "נקבעה",
   attendance_confirmed: "הגעה אושרה",
   completed: "התקיימה",
