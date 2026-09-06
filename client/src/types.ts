@@ -70,6 +70,22 @@ export type Meeting = {
   updatedAt?: string;
 };
 
+export type NotificationType =
+  | "new_meeting_request"
+  | "meeting_approved"
+  | "meeting_rejected"
+  | "meeting_canceled";
+
+export type NotificationItem = {
+  _id: string;
+  recipient: string;
+  type: NotificationType;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const statusLabels: Record<MeetingStatus, string> = {
   pending_mentor_times: "ממתינה להצעת זמנים",
   pending_mentee_selection: "ממתינה לבחירת זמן",
