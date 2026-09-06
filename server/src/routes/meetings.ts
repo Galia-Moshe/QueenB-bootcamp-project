@@ -210,6 +210,154 @@ router.patch("/:id/select-time", requireAuth, async (req: AuthRequest, res, next
   }
 });
 
+router.patch("/:id/approve", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    if (!isSameId(meeting.mentorId, req.user!._id)) {
+      return res.status(403).json({ error: "רק המנטורית של הפגישה יכולה לאשר אותה" });
+    }
+
+    if (!meeting.availabilityWindowId) {
+      return res.status(400).json({ error: "לא ניתן לאשר פגישה זו בדרך הזו" });
+    }
+
+    if (meeting.status !== "pending_mentor_times") {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    const availabilityWindow = await AvailabilityWindow.findById(meeting.availabilityWindowId);
+    if (!availabilityWindow) {
+      return res.status(404).json({ error: "חלון הזמינות של הפגישה לא נמצא" });
+    }
+
+    if (!isSameId(availabilityWindow.mentorId, req.user!._id)) {
+      return res.status(403).json({ error: "רק המנטורית של הפגישה יכולה לאשר אותה" });
+    }
+
+    if (availabilityWindow.status !== "pending") {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    // Atomically claim the approval: only the request that flips pending -> booked may proceed.
+    const bookedWindow = await AvailabilityWindow.findOneAndUpdate(
+      { _id: availabilityWindow._id, status: "pending" },
+      { $set: { status: "booked" } },
+      { new: true }
+    );
+
+    if (!bookedWindow) {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    const selectedTime = new Date(`${bookedWindow.date}T${bookedWindow.startTime}:00`);
+
+    const scheduledMeeting = await Meeting.findOneAndUpdate(
+      { _id: meeting._id, status: "pending_mentor_times" },
+      { $set: { status: "scheduled", selectedTime } },
+      { new: true }
+    );
+
+    if (!scheduledMeeting) {
+      // The meeting moved out of the pending state concurrently: undo the window claim
+      // rather than leaving a "booked" window with no matching scheduled meeting.
+      await AvailabilityWindow.findOneAndUpdate(
+        { _id: bookedWindow._id, status: "booked" },
+        { $set: { status: "pending" } }
+      );
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    await User.findByIdAndUpdate(scheduledMeeting.mentorId, { $inc: { mentoringSessionsCount: 1 } });
+    await User.findByIdAndUpdate(scheduledMeeting.menteeId, { $inc: { menteeSessionsCount: 1 } });
+
+    const populatedMeeting = await Meeting.findById(scheduledMeeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:id/reject", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    if (!isSameId(meeting.mentorId, req.user!._id)) {
+      return res.status(403).json({ error: "רק המנטורית של הפגישה יכולה לדחות אותה" });
+    }
+
+    if (!meeting.availabilityWindowId) {
+      return res.status(400).json({ error: "לא ניתן לדחות פגישה זו בדרך הזו" });
+    }
+
+    if (meeting.status !== "pending_mentor_times") {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    const availabilityWindow = await AvailabilityWindow.findById(meeting.availabilityWindowId);
+    if (!availabilityWindow) {
+      return res.status(404).json({ error: "חלון הזמינות של הפגישה לא נמצא" });
+    }
+
+    if (!isSameId(availabilityWindow.mentorId, req.user!._id)) {
+      return res.status(403).json({ error: "רק המנטורית של הפגישה יכולה לדחות אותה" });
+    }
+
+    if (availabilityWindow.status !== "pending") {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    // Atomically release the slot: only the rejection that finds it still "pending" may proceed.
+    const releasedWindow = await AvailabilityWindow.findOneAndUpdate(
+      { _id: availabilityWindow._id, status: "pending" },
+      { $set: { status: "available" } },
+      { new: true }
+    );
+
+    if (!releasedWindow) {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    const canceledMeeting = await Meeting.findOneAndUpdate(
+      { _id: meeting._id, status: "pending_mentor_times" },
+      { $set: { status: "canceled" } },
+      { new: true }
+    );
+
+    if (!canceledMeeting) {
+      // The meeting moved out of the pending state concurrently: undo the window release
+      // rather than leaving an "available" window whose meeting was never actually canceled.
+      // Guarded on "available" so it never clobbers a slot another mentee has since re-booked.
+      await AvailabilityWindow.findOneAndUpdate(
+        { _id: releasedWindow._id, status: "available" },
+        { $set: { status: "pending" } }
+      );
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    const populatedMeeting = await Meeting.findById(canceledMeeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch("/:id/decline", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const meeting = await Meeting.findById(req.params.id);

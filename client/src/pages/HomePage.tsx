@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -57,12 +58,14 @@ function PendingMeetingCard({
 }: {
   meeting: Meeting;
   role: MeetingRole;
-  onChanged: () => void;
+  onChanged: (message?: string, severity?: "success" | "error") => void;
 }) {
   const [times, setTimes] = useState(["", "", ""]);
   const [selectedTime, setSelectedTime] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
   const availabilityWindow = getAvailabilityWindow(meeting);
   const isNewFlowMentorView = role === "mentor" && Boolean(availabilityWindow);
@@ -70,6 +73,46 @@ function PendingMeetingCard({
   const canPropose =
     role === "mentor" && meeting.status === "pending_mentor_times" && !availabilityWindow;
   const canSelect = role === "mentee" && meeting.status === "pending_mentee_selection";
+
+  const approveMeeting = async () => {
+    if (approving || rejecting) return;
+
+    setError("");
+    setApproving(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/approve`);
+      onChanged("הפגישה אושרה ונקבעה בהצלחה", "success");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        onChanged("הבקשה הזו כבר טופלה. הרשימה עודכנה.", "error");
+      } else {
+        setError(getApiErrorMessage(err));
+      }
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const rejectMeeting = async () => {
+    if (approving || rejecting) return;
+
+    setError("");
+    setRejecting(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/reject`);
+      onChanged("הבקשה נדחתה והמועד פתוח שוב לקביעה", "success");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        onChanged("הבקשה הזו כבר טופלה. הרשימה עודכנה.", "error");
+      } else {
+        setError(getApiErrorMessage(err));
+      }
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const proposeTimes = async () => {
     setError("");
@@ -129,16 +172,24 @@ function PendingMeetingCard({
               </Typography>
             </Box>
             <Stack direction="row" spacing={1}>
-              <Button variant="contained" startIcon={<EventAvailableIcon />} disabled>
-                אישור פגישה
+              <Button
+                variant="contained"
+                startIcon={<EventAvailableIcon />}
+                disabled={approving || rejecting}
+                onClick={approveMeeting}
+              >
+                {approving ? "מאשרת..." : "אישור פגישה"}
               </Button>
-              <Button variant="outlined" color="error" startIcon={<EventBusyIcon />} disabled>
-                דחיית בקשה
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<EventBusyIcon />}
+                disabled={approving || rejecting}
+                onClick={rejectMeeting}
+              >
+                {rejecting ? "דוחה..." : "דחיית בקשה"}
               </Button>
             </Stack>
-            <Typography variant="caption" color="text.secondary">
-              אישור ודחייה יתאפשרו בשלב הבא.
-            </Typography>
           </Stack>
         )}
 
@@ -210,6 +261,9 @@ export default function HomePage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] = useState<{ text: string; severity: "success" | "error" } | null>(
+    null
+  );
 
   const loadMeetings = useCallback(async (meetingRole: MeetingRole) => {
     setError("");
@@ -230,7 +284,16 @@ export default function HomePage() {
     }
   }, []);
 
+  const handleMeetingChanged = useCallback(
+    (message?: string, severity: "success" | "error" = "success") => {
+      setActionMessage(message ? { text: message, severity } : null);
+      loadMeetings(role);
+    },
+    [role, loadMeetings]
+  );
+
   useEffect(() => {
+    setActionMessage(null);
     loadMeetings(role);
   }, [role, loadMeetings]);
 
@@ -248,7 +311,9 @@ export default function HomePage() {
     [meetings, role]
   );
 
-  const pendingMeetings = meetings.filter((meeting) => !meeting.selectedTime);
+  const pendingMeetings = meetings.filter(
+    (meeting) => !meeting.selectedTime && meeting.status !== "canceled"
+  );
   const canSwitchRoles = Boolean(mentorProfile);
 
   return (
@@ -279,6 +344,7 @@ export default function HomePage() {
       />
 
       {error && <Alert severity="error">{error}</Alert>}
+      {actionMessage && <Alert severity={actionMessage.severity}>{actionMessage.text}</Alert>}
 
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
@@ -329,7 +395,7 @@ export default function HomePage() {
                     key={meeting._id}
                     meeting={meeting}
                     role={role}
-                    onChanged={() => loadMeetings(role)}
+                    onChanged={handleMeetingChanged}
                   />
                 ))
               )}
