@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { Stack, Tab, Tabs } from "@mui/material";
+import { AdminStatisticsView } from "../components/admin/AdminStatisticsView";
 import { AdminSystemCalendar } from "../components/admin/AdminSystemCalendar";
 import { AdminUsersView } from "../components/admin/AdminUsersView";
 import PageHero from "../components/ui/PageHero";
 
-type AdminTab = "calendar" | "users";
+type AdminTab = "calendar" | "users" | "statistics";
 
 export default function AdminPage() {
   const [activeTab, setActiveTab] = useState<AdminTab>("calendar");
@@ -22,9 +23,12 @@ export default function AdminPage() {
       >
         <Tab label="יומן מערכת" value="calendar" />
         <Tab label="משתמשות" value="users" />
+        <Tab label="סטטיסטיקות" value="statistics" />
       </Tabs>
 
-      {activeTab === "calendar" ? <AdminSystemCalendar /> : <AdminUsersView />}
+      {activeTab === "calendar" && <AdminSystemCalendar />}
+      {activeTab === "users" && <AdminUsersView />}
+      {activeTab === "statistics" && <AdminStatisticsView />}
     </Stack>
   );
 }
