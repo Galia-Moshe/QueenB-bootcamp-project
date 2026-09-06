@@ -257,9 +257,11 @@ function PendingMeetingCard({
 
 function ScheduledMeetingCard({
   meeting,
+  role,
   onChanged,
 }: {
   meeting: Meeting;
+  role: MeetingRole;
   onChanged: (message?: string, severity?: "success" | "error") => void;
 }) {
   const [error, setError] = useState("");
@@ -292,7 +294,7 @@ function ScheduledMeetingCard({
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
           <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
-            {otherParticipantName(meeting, "mentee")}
+            {otherParticipantName(meeting, role)}
           </Typography>
           <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
         </Stack>
@@ -310,15 +312,17 @@ function ScheduledMeetingCard({
           </Box>
         )}
 
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<EventBusyIcon />}
-          disabled={canceling}
-          onClick={cancelMeeting}
-        >
-          {canceling ? "מבטלת..." : "ביטול פגישה"}
-        </Button>
+        {role === "mentee" && (
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<EventBusyIcon />}
+            disabled={canceling}
+            onClick={cancelMeeting}
+          >
+            {canceling ? "מבטלת..." : "ביטול פגישה"}
+          </Button>
+        )}
       </Stack>
     </SurfaceCard>
   );
@@ -384,12 +388,9 @@ export default function HomePage() {
     (meeting) => !meeting.selectedTime && meeting.status !== "canceled"
   );
 
-  const cancellableScheduledMeetings =
-    role === "mentee"
-      ? meetings.filter(
-          (meeting) => meeting.status === "scheduled" && Boolean(getAvailabilityWindow(meeting))
-        )
-      : [];
+  const scheduledMeetingsList = meetings.filter(
+    (meeting) => meeting.status === "scheduled" && Boolean(getAvailabilityWindow(meeting))
+  );
 
   const canSwitchRoles = Boolean(mentorProfile);
 
@@ -477,7 +478,7 @@ export default function HomePage() {
                 ))
               )}
 
-              {cancellableScheduledMeetings.length > 0 && (
+              {scheduledMeetingsList.length > 0 && (
                 <>
                   <Divider />
                   <Box>
@@ -485,13 +486,14 @@ export default function HomePage() {
                       הפגישות המתוזמנות שלי
                     </Typography>
                     <Typography variant="body2" color="text.secondary">
-                      ניתן לבטל פגישה שנקבעה
+                      {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
                     </Typography>
                   </Box>
-                  {cancellableScheduledMeetings.map((meeting) => (
+                  {scheduledMeetingsList.map((meeting) => (
                     <ScheduledMeetingCard
                       key={meeting._id}
                       meeting={meeting}
+                      role={role}
                       onChanged={handleMeetingChanged}
                     />
                   ))}
