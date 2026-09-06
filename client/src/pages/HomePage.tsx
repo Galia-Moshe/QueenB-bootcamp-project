@@ -1,8 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
-import FullCalendar from "@fullcalendar/react";
-import type { EventClickArg } from "@fullcalendar/core";
-import type { DateClickArg } from "@fullcalendar/interaction";
 import {
   Alert,
   Box,
@@ -20,16 +17,14 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import EventBusyIcon from "@mui/icons-material/EventBusy";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../api";
+import { HomeCalendar } from "../components/home/HomeCalendar";
+import { HomeMeetingsSidebar } from "../components/home/HomeMeetingsSidebar";
 import { MeetingDetailsModal } from "../components/meetings/MeetingDetailsModal";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import type { AvailabilityWindow, Meeting, MentorProfile } from "../types";
 import { statusLabels } from "../types";
-import {
-  formatMeetingToEvent,
-  sharedCalendarContainerSx,
-  sharedCalendarProps,
-} from "../utils/calendarUtils";
+import { meetingEventStart } from "../utils/calendarUtils";
 
 type MeetingRole = "mentee" | "mentor";
 
@@ -59,6 +54,21 @@ function getAvailabilityWindow(meeting: Meeting): AvailabilityWindow | null {
 
 function otherParticipantName(meeting: Meeting, role: MeetingRole) {
   return role === "mentor" ? meeting.menteeId.username : meeting.mentorId.username;
+}
+
+/** Align calendar dots and sidebar filters on the same date key. */
+function meetingDateKey(meeting: Meeting): string | null {
+  const availabilityWindow = getAvailabilityWindow(meeting);
+  if (availabilityWindow?.date) {
+    return availabilityWindow.date;
+  }
+
+  const start = meetingEventStart(meeting);
+  if (!start) {
+    return null;
+  }
+
+  return toDateKey(new Date(start));
 }
 
 function PendingMeetingCard({
@@ -381,40 +391,45 @@ export default function HomePage() {
     loadMeetings(role);
   }, [role, loadMeetings]);
 
-  const handleEventClick = useCallback(
-    (clickInfo: EventClickArg) => {
-      const meeting = meetings.find((item) => item._id === clickInfo.event.id);
-      if (meeting) {
-        setSelectedMeeting(meeting);
-      }
-    },
-    [meetings]
-  );
+  const handleMeetingClick = useCallback((meeting: Meeting) => {
+    setSelectedMeeting(meeting);
+  }, []);
 
   const closeMeetingDetails = useCallback(() => {
     setSelectedMeeting(null);
   }, []);
 
-  const scheduledEvents = useMemo(
-    () =>
-      meetings
-        .filter((meeting) => meeting.status === "scheduled")
-        .map((meeting) => formatMeetingToEvent(meeting, role))
-        .filter((event): event is NonNullable<typeof event> => event !== null),
-    [meetings, role]
+  const scheduledMeetings = useMemo(
+    () => meetings.filter((meeting) => meeting.status === "scheduled"),
+    [meetings]
   );
+
+  const datesWithEvents = useMemo(() => {
+    const dates = new Set<string>();
+    for (const meeting of scheduledMeetings) {
+      const dateKey = meetingDateKey(meeting);
+      if (dateKey) {
+        dates.add(dateKey);
+      }
+    }
+    return dates;
+  }, [scheduledMeetings]);
+
+  const filteredEvents = useMemo(() => {
+    if (!selectedDate) {
+      return [];
+    }
+
+    return scheduledMeetings.filter((meeting) => meetingDateKey(meeting) === selectedDate);
+  }, [scheduledMeetings, selectedDate]);
 
   const pendingMeetings = meetings.filter(
     (meeting) => !meeting.selectedTime && meeting.status !== "canceled"
   );
 
-  const scheduledMeetingsList = meetings.filter(
-    (meeting) => meeting.status === "scheduled" && Boolean(getAvailabilityWindow(meeting))
+  const scheduledMeetingsList = scheduledMeetings.filter((meeting) =>
+    Boolean(getAvailabilityWindow(meeting))
   );
-
-  const selectedDayMeetings = selectedDate
-    ? scheduledMeetingsList.filter((meeting) => getAvailabilityWindow(meeting)?.date === selectedDate)
-    : [];
 
   const canSwitchRoles = Boolean(mentorProfile);
 
@@ -454,121 +469,69 @@ export default function HomePage() {
         </Box>
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "2fr 1fr" }, gap: 3 }}>
-          <SurfaceCard
-            sx={{
-              ...sharedCalendarContainerSx,
-              "& .fc-daygrid-day-frame": {
-                cursor: "pointer",
-                transition: "background-color 0.15s ease",
-              },
-              "& .fc-daygrid-day-frame:hover": {
-                backgroundColor: "rgba(236, 64, 122, 0.08)",
-              },
-              "& .fc-event": {
-                cursor: "pointer",
-              },
-              "& .fc-day-selected .fc-daygrid-day-frame": {
-                backgroundColor: "rgba(216, 27, 96, 0.16)",
-                boxShadow: "inset 0 0 0 2px #d81b60",
-              },
-            }}
-          >
-            <FullCalendar
-              {...sharedCalendarProps}
-              events={scheduledEvents}
-              dateClick={(arg: DateClickArg) => setSelectedDate(toDateKey(arg.date))}
-              eventClick={(arg: EventClickArg) => {
-                handleEventClick(arg);
-                if (arg.event.start) {
-                  setSelectedDate(toDateKey(arg.event.start));
-                }
-              }}
-              dayCellClassNames={(arg) => (toDateKey(arg.date) === selectedDate ? ["fc-day-selected"] : [])}
-            />
-          </SurfaceCard>
+          <HomeCalendar
+            selectedDate={selectedDate}
+            datesWithEvents={datesWithEvents}
+            onSelectDate={setSelectedDate}
+          />
 
-          <SurfaceCard>
-            <Stack spacing={2}>
-              <Box>
-                <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-                  בקשות שמחכות לטיפול
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {role === "mentor" ? "בקשות שבהן את המנטורית" : "בקשות שבהן את המנטית"}
-                </Typography>
-              </Box>
+          <HomeMeetingsSidebar
+            role={role}
+            selectedDate={selectedDate}
+            filteredEvents={filteredEvents}
+            onClearSelectedDate={() => setSelectedDate(null)}
+            onEventClick={handleMeetingClick}
+            pendingSection={
+              <>
+                <Box>
+                  <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                    בקשות שמחכות לטיפול
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {role === "mentor" ? "בקשות שבהן את המנטורית" : "בקשות שבהן את המנטית"}
+                  </Typography>
+                </Box>
 
-              <Divider />
+                <Divider />
 
-              {pendingMeetings.length === 0 ? (
-                <Typography color="text.secondary">אין בקשות פתוחות כרגע.</Typography>
-              ) : (
-                pendingMeetings.map((meeting) => (
-                  <PendingMeetingCard
-                    key={meeting._id}
-                    meeting={meeting}
-                    role={role}
-                    onChanged={handleMeetingChanged}
-                  />
-                ))
-              )}
-
-              {(selectedDate || scheduledMeetingsList.length > 0) && (
+                {pendingMeetings.length === 0 ? (
+                  <Typography color="text.secondary">אין בקשות פתוחות כרגע.</Typography>
+                ) : (
+                  pendingMeetings.map((meeting) => (
+                    <PendingMeetingCard
+                      key={meeting._id}
+                      meeting={meeting}
+                      role={role}
+                      onChanged={handleMeetingChanged}
+                    />
+                  ))
+                )}
+              </>
+            }
+            allScheduledSection={
+              scheduledMeetingsList.length > 0 ? (
                 <>
                   <Divider />
-                  {selectedDate ? (
-                    <>
-                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
-                        <Box>
-                          <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-                            הפגישות ב־{formatWindowDate(selectedDate)}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
-                          </Typography>
-                        </Box>
-                        <Button size="small" onClick={() => setSelectedDate(null)}>
-                          הצג את כל הפגישות
-                        </Button>
-                      </Stack>
-
-                      {selectedDayMeetings.length === 0 ? (
-                        <Typography color="text.secondary">אין פגישות מתוזמנות ביום זה.</Typography>
-                      ) : (
-                        selectedDayMeetings.map((meeting) => (
-                          <ScheduledMeetingCard
-                            key={meeting._id}
-                            meeting={meeting}
-                            role={role}
-                            onChanged={handleMeetingChanged}
-                          />
-                        ))
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      <Box>
-                        <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-                          הפגישות המתוזמנות שלי
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
-                        </Typography>
-                      </Box>
-                      {scheduledMeetingsList.map((meeting) => (
-                        <ScheduledMeetingCard
-                          key={meeting._id}
-                          meeting={meeting}
-                          role={role}
-                          onChanged={handleMeetingChanged}
-                        />
-                      ))}
-                    </>
-                  )}
+                  <Box>
+                    <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                      הפגישות המתוזמנות שלי
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
+                    </Typography>
+                  </Box>
+                  {scheduledMeetingsList.map((meeting) => (
+                    <ScheduledMeetingCard
+                      key={meeting._id}
+                      meeting={meeting}
+                      role={role}
+                      onChanged={handleMeetingChanged}
+                    />
+                  ))}
                 </>
-              )}
-            </Stack>
-          </SurfaceCard>
+              ) : undefined
+            }
+          />
         </Box>
       )}
 
