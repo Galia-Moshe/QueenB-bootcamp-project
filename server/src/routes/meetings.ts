@@ -151,10 +151,10 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
 router.get("/my", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const role = req.query.role;
-    const filter =
-      role === "mentor"
-        ? { mentorId: req.user!._id }
-        : { menteeId: req.user!._id };
+    const filter = {
+      ...(role === "mentor" ? { mentorId: req.user!._id } : { menteeId: req.user!._id }),
+      status: { $ne: "canceled" },
+    };
 
     const meetings = await populateMeeting(Meeting.find(filter));
     return res.json({ meetings });
@@ -173,6 +173,10 @@ router.patch("/:id/propose-times", requireAuth, async (req: AuthRequest, res, ne
 
     if (!isSameId(meeting.mentorId, req.user!._id)) {
       return res.status(403).json({ error: "רק המנטורית יכולה להציע זמנים" });
+    }
+
+    if (meeting.status === "canceled") {
+      return res.status(400).json({ error: "לא ניתן לעדכן פגישה שבוטלה" });
     }
 
     const proposedTimes = parseDateList(req.body.proposedTimes);
@@ -204,6 +208,10 @@ router.patch("/:id/select-time", requireAuth, async (req: AuthRequest, res, next
 
     if (!isSameId(meeting.menteeId, req.user!._id)) {
       return res.status(403).json({ error: "רק המנטית יכולה לבחור זמן" });
+    }
+
+    if (meeting.status === "canceled") {
+      return res.status(400).json({ error: "לא ניתן לעדכן פגישה שבוטלה" });
     }
 
     const selectedTime = new Date(String(req.body.selectedTime));
@@ -502,8 +510,10 @@ router.patch("/:id/decline", requireAuth, async (req: AuthRequest, res, next) =>
       return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
     }
 
-    meeting.status = "canceled";
-    await meeting.save();
+    if (meeting.status !== "canceled") {
+      meeting.status = "canceled";
+      await meeting.save();
+    }
 
     const populatedMeeting = await Meeting.findById(meeting._id)
       .populate("mentorId", "-passwordHash")

@@ -31,6 +31,19 @@ export type MentorProfile = {
   updatedAt?: string;
 };
 
+export type MenteeProfile = {
+  _id: string;
+  userId: User | string;
+  about?: string;
+  skills: string[];
+  techStack: string[];
+  helpTopics: string[];
+  goals?: string;
+  experienceLevel?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type MentorsPagination = {
   page: number;
   limit: number;

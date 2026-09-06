@@ -9,6 +9,7 @@ import {
   Toolbar,
   Typography,
 } from "@mui/material";
+import AccountCircleIcon from "@mui/icons-material/AccountCircle";
 import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import LogoutIcon from "@mui/icons-material/Logout";
@@ -116,19 +117,17 @@ export function AppLayout() {
 
           <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: "wrap" }}>
             <NotificationBell />
-            <Typography
-              variant="body2"
-              sx={{
-                px: 1.5,
-                py: 0.75,
-                borderRadius: 2,
-                color: "#ffffff",
-                backgroundColor: "rgba(255, 255, 255, 0.14)",
-                fontWeight: 800,
-              }}
+
+            <Button
+              component={RouterLink}
+              to="/profile"
+              startIcon={<AccountCircleIcon />}
+              variant={location.pathname === "/profile" ? "contained" : "text"}
+              sx={navButtonSx(location.pathname === "/profile")}
             >
-              {user?.username}
-            </Typography>
+              {user?.username ? `${user.username} - אזור אישי` : "אזור אישי"}
+            </Button>
+
             <Button
               color="inherit"
               startIcon={<LogoutIcon />}
