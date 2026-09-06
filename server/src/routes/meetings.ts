@@ -525,4 +525,288 @@ router.patch("/:id/decline", requireAuth, async (req: AuthRequest, res, next) =>
   }
 });
 
+router.patch("/:id/attendance", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    // Legacy meetings may still have attendanceResponses as an array — normalize first.
+    if (mongoose.Types.ObjectId.isValid(req.params.id)) {
+      await Meeting.collection.updateOne(
+        {
+          _id: new mongoose.Types.ObjectId(req.params.id),
+          $or: [
+            { attendanceResponses: { $type: "array" } },
+            { attendanceResponses: { $exists: false } },
+            { attendanceResponses: null },
+          ],
+        },
+        { $set: { attendanceResponses: { mentor: null, mentee: null } } }
+      );
+    }
+
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    const isMentor = isSameId(meeting.mentorId, req.user!._id);
+    const isMentee = isSameId(meeting.menteeId, req.user!._id);
+
+    if (!isMentor && !isMentee) {
+      return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
+    }
+
+    if (meeting.status !== "scheduled") {
+      return res.status(409).json({ error: "ניתן לענות על אישור הגעה רק לפגישה מתוזמנת" });
+    }
+
+    const attended = req.body.attended === true || req.body.attended === "true";
+    const didNotAttend = req.body.attended === false || req.body.attended === "false";
+
+    if (!attended && !didNotAttend) {
+      return res.status(400).json({ error: "יש לציין האם הפגישה התקיימה" });
+    }
+
+    const responseValue = attended ? "yes" : "no";
+    const roleKey = isMentor ? "mentor" : "mentee";
+
+    const currentResponses = {
+      mentor: meeting.attendanceResponses?.mentor ?? null,
+      mentee: meeting.attendanceResponses?.mentee ?? null,
+    };
+
+    if (currentResponses[roleKey] != null) {
+      return res.status(409).json({ error: "כבר ענית על אישור ההגעה לפגישה זו" });
+    }
+
+    currentResponses[roleKey] = responseValue;
+    meeting.attendanceResponses = currentResponses;
+    meeting.markModified("attendanceResponses");
+
+    let outcome: "awaiting_other" | "confirmed" | "canceled" | "disputed" = "awaiting_other";
+    let message = "תודה! המערכת ממתינה לאישור המשתתפת השנייה.";
+
+    const mentorResponse = currentResponses.mentor;
+    const menteeResponse = currentResponses.mentee;
+
+    if (mentorResponse != null && menteeResponse != null) {
+      if (mentorResponse === "yes" && menteeResponse === "yes") {
+        meeting.status = "attendance_confirmed";
+        outcome = "confirmed";
+        message =
+          "שתיכן אישרתן שהפגישה התקיימה. אפשר למלא משוב עכשיו או לקבל תזכורת בעוד 24 שעות.";
+      } else if (mentorResponse === "no" && menteeResponse === "no") {
+        if (meeting.availabilityWindowId) {
+          await AvailabilityWindow.findOneAndUpdate(
+            { _id: meeting.availabilityWindowId, status: "booked" },
+            { $set: { status: "available" } }
+          );
+        }
+        meeting.status = "canceled";
+        outcome = "canceled";
+        message = "הפגישה בוטלה לאחר ששתיכן דיווחתן שהיא לא התקיימה.";
+      } else {
+        meeting.status = "disputed";
+        outcome = "disputed";
+        message = "התקבל דיווח לא תואם לגבי הפגישה. הנושא הועבר לבדיקת צוות המערכת.";
+      }
+    } else if (!attended) {
+      message = "תודה על העדכון. המערכת ממתינה לתשובת המשתתפת השנייה.";
+    }
+
+    await meeting.save();
+
+    const waitingMessage = "תודה! המערכת ממתינה לאישור המשתתפת השנייה.";
+    const feedbackPromptMessage =
+      "שתיכן אישרתן שהפגישה התקיימה. מלאי משוב עכשיו, או הזכירי לי מחר (בעוד 24 שעות).";
+    const discrepancyMessage =
+      "התקבל דיווח לא תואם לגבי הפגישה. הנושא הועבר לבדיקת צוות המערכת.";
+
+    await Notification.updateMany(
+      {
+        meetingId: meeting._id,
+        type: "attendance_check",
+        recipient: req.user!._id,
+        actionStatus: "pending",
+      },
+      {
+        $set: {
+          actionStatus:
+            outcome === "confirmed"
+              ? "feedback_choice"
+              : outcome === "awaiting_other" && attended
+                ? "awaiting_other"
+                : "answered",
+          read: true,
+          ...(outcome === "awaiting_other" && attended ? { message: waitingMessage } : {}),
+        },
+      }
+    );
+
+    if (outcome === "confirmed") {
+      await Notification.updateMany(
+        {
+          meetingId: meeting._id,
+          type: "attendance_check",
+        },
+        {
+          $set: {
+            actionStatus: "feedback_choice",
+            read: false,
+            message: feedbackPromptMessage,
+          },
+        }
+      );
+    }
+
+    if (outcome === "canceled" || outcome === "disputed") {
+      await Notification.updateMany(
+        {
+          meetingId: meeting._id,
+          type: "attendance_check",
+          actionStatus: { $in: ["pending", "feedback_choice", "awaiting_other"] },
+        },
+        { $set: { actionStatus: "answered", read: true } }
+      );
+    }
+
+    if (outcome === "disputed") {
+      await Notification.create([
+        {
+          recipient: meeting.mentorId,
+          type: "attendance_discrepancy",
+          meetingId: meeting._id,
+          message: discrepancyMessage,
+        },
+        {
+          recipient: meeting.menteeId,
+          type: "attendance_discrepancy",
+          meetingId: meeting._id,
+          message: discrepancyMessage,
+        },
+      ]);
+    }
+
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({ meeting: populatedMeeting, outcome, message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:id/remind-feedback", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    const isMentor = isSameId(meeting.mentorId, req.user!._id);
+    const isMentee = isSameId(meeting.menteeId, req.user!._id);
+
+    if (!isMentor && !isMentee) {
+      return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
+    }
+
+    if (meeting.status !== "attendance_confirmed") {
+      return res.status(409).json({ error: "ניתן לקבוע תזכורת משוב רק לאחר אישור שהפגישה התקיימה" });
+    }
+
+    const alreadySubmitted = meeting.feedbacks.some((feedback) =>
+      isSameId(feedback.fromUserId, req.user!._id)
+    );
+
+    if (alreadySubmitted) {
+      return res.status(409).json({ error: "כבר שלחת משוב לפגישה זו" });
+    }
+
+    meeting.feedbackReminderAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await meeting.save();
+
+    await Notification.updateMany(
+      {
+        meetingId: meeting._id,
+        recipient: req.user!._id,
+        type: { $in: ["attendance_check", "feedback_reminder"] },
+        actionStatus: { $in: ["pending", "feedback_choice", "awaiting_other"] },
+      },
+      { $set: { actionStatus: "answered", read: true } }
+    );
+
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/:id/feedback", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    const isMentor = isSameId(meeting.mentorId, req.user!._id);
+    const isMentee = isSameId(meeting.menteeId, req.user!._id);
+
+    if (!isMentor && !isMentee) {
+      return res.status(403).json({ error: "אין לך הרשאה לשלוח משוב לפגישה הזו" });
+    }
+
+    if (meeting.status !== "attendance_confirmed" && meeting.status !== "feedback_submitted") {
+      return res.status(409).json({ error: "ניתן לשלוח משוב רק לאחר אישור שהפגישה התקיימה" });
+    }
+
+    const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
+    if (!content) {
+      return res.status(400).json({ error: "יש להזין תוכן משוב" });
+    }
+
+    const role = isMentor ? "mentor" : "mentee";
+    const alreadySubmitted = meeting.feedbacks.some(
+      (feedback) => isSameId(feedback.fromUserId, req.user!._id)
+    );
+
+    if (alreadySubmitted) {
+      return res.status(409).json({ error: "כבר שלחת משוב לפגישה זו" });
+    }
+
+    meeting.feedbacks.push({
+      fromUserId: req.user!._id,
+      role,
+      content,
+    });
+    meeting.status = "feedback_submitted";
+    await meeting.save();
+
+    await Meeting.updateOne({ _id: meeting._id }, { $unset: { feedbackReminderAt: 1 } });
+
+    await Notification.deleteMany({
+      recipient: req.user!._id,
+      meetingId: meeting._id,
+      type: { $in: ["feedback_reminder", "attendance_check"] },
+    });
+
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId")
+      .populate("feedbacks.fromUserId", "-passwordHash");
+
+    return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;

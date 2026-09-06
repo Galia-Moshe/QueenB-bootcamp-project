@@ -350,6 +350,13 @@ export function AdminSystemCalendar() {
         meeting={selectedMeeting}
         open={Boolean(selectedMeeting)}
         onClose={closeMeetingDetails}
+        adminMode
+        onMeetingUpdated={(updatedMeeting) => {
+          setMeetings((current) =>
+            current.map((item) => (item._id === updatedMeeting._id ? updatedMeeting : item))
+          );
+          setSelectedMeeting(updatedMeeting);
+        }}
       />
     </Stack>
   );

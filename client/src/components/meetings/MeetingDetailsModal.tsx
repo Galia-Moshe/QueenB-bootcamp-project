@@ -1,24 +1,36 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
+  Alert,
   Box,
   Button,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  FormControl,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Typography,
 } from "@mui/material";
-import type { Meeting, User } from "../../types";
-import { statusColors, statusLabels } from "../../types";
+import { api, getApiErrorMessage } from "../../api";
+import type { Meeting, MeetingStatus, User } from "../../types";
+import { meetingStatusOptions, statusColors, statusLabels } from "../../types";
 import { UserProfileLink } from "../UserProfileLink";
 
 const feedbackRoleLabels: Record<"mentor" | "mentee", string> = {
   mentor: "מנטורית",
   mentee: "מנטית",
+};
+
+const attendanceResponseLabels: Record<"yes" | "no", string> = {
+  yes: "כן, התקיימה",
+  no: "לא התקיימה",
 };
 
 function feedbackAuthorName(fromUserId: User | string, fallbackRole: "mentor" | "mentee") {
@@ -66,9 +78,46 @@ type MeetingDetailsModalProps = {
   meeting: Meeting | null;
   open: boolean;
   onClose: () => void;
+  adminMode?: boolean;
+  onMeetingUpdated?: (meeting: Meeting) => void;
 };
 
-export function MeetingDetailsModal({ meeting, open, onClose }: MeetingDetailsModalProps) {
+export function MeetingDetailsModal({
+  meeting,
+  open,
+  onClose,
+  adminMode = false,
+  onMeetingUpdated,
+}: MeetingDetailsModalProps) {
+  const [selectedStatus, setSelectedStatus] = useState<MeetingStatus | "">("");
+  const [savingStatus, setSavingStatus] = useState(false);
+  const [statusError, setStatusError] = useState("");
+
+  useEffect(() => {
+    setSelectedStatus(meeting?.status ?? "");
+    setStatusError("");
+  }, [meeting]);
+
+  const handleSaveStatus = async () => {
+    if (!meeting || !selectedStatus || selectedStatus === meeting.status || savingStatus) {
+      return;
+    }
+
+    setSavingStatus(true);
+    setStatusError("");
+
+    try {
+      const response = await api.patch<{ meeting: Meeting }>(`/admin/meetings/${meeting._id}/status`, {
+        status: selectedStatus,
+      });
+      onMeetingUpdated?.(response.data.meeting);
+    } catch (err) {
+      setStatusError(getApiErrorMessage(err));
+    } finally {
+      setSavingStatus(false);
+    }
+  };
+
   return (
     <Dialog
       open={open}
@@ -98,6 +147,43 @@ export function MeetingDetailsModal({ meeting, open, onClose }: MeetingDetailsMo
                 }}
               />
             </Stack>
+
+            {adminMode && (
+              <Stack spacing={1.5}>
+                {meeting.status === "disputed" && (
+                  <Alert severity="warning">
+                    הפגישה במחלוקת — ניתן לעדכן ידנית את הסטטוס לאחר בדיקה.
+                  </Alert>
+                )}
+                <FormControl fullWidth size="small">
+                  <InputLabel id="admin-meeting-status-update">עדכון סטטוס</InputLabel>
+                  <Select
+                    labelId="admin-meeting-status-update"
+                    label="עדכון סטטוס"
+                    value={selectedStatus}
+                    onChange={(event) => setSelectedStatus(event.target.value as MeetingStatus)}
+                    disabled={savingStatus}
+                  >
+                    {meetingStatusOptions.map((option) => (
+                      <MenuItem key={option} value={option}>
+                        {statusLabels[option]}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                {statusError && <Alert severity="error">{statusError}</Alert>}
+                <Box>
+                  <Button
+                    variant="contained"
+                    onClick={handleSaveStatus}
+                    disabled={savingStatus || !selectedStatus || selectedStatus === meeting.status}
+                    startIcon={savingStatus ? <CircularProgress size={16} color="inherit" /> : undefined}
+                  >
+                    שמירת סטטוס
+                  </Button>
+                </Box>
+              </Stack>
+            )}
 
             <Box>
               <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.5 }}>
@@ -129,6 +215,40 @@ export function MeetingDetailsModal({ meeting, open, onClose }: MeetingDetailsMo
               <ParticipantDetails title="מנטורית" user={meeting.mentorId} />
               <ParticipantDetails title="מנטית" user={meeting.menteeId} />
             </Stack>
+
+            {adminMode &&
+              meeting.attendanceResponses &&
+              (meeting.attendanceResponses.mentor != null ||
+                meeting.attendanceResponses.mentee != null) && (
+                <Box>
+                  <Divider sx={{ mb: 2 }} />
+                  <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
+                    תשובות אישור הגעה
+                  </Typography>
+                  <Stack spacing={1}>
+                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        מנטורית
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {meeting.attendanceResponses.mentor
+                          ? attendanceResponseLabels[meeting.attendanceResponses.mentor]
+                          : "טרם נענתה"}
+                      </Typography>
+                    </Paper>
+                    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        מנטית
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {meeting.attendanceResponses.mentee
+                          ? attendanceResponseLabels[meeting.attendanceResponses.mentee]
+                          : "טרם נענתה"}
+                      </Typography>
+                    </Paper>
+                  </Stack>
+                </Box>
+              )}
 
             {meeting.status === "feedback_submitted" && (
               <Box>
