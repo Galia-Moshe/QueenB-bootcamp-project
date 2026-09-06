@@ -97,3 +97,37 @@ export const meetingStatusOptions: MeetingStatus[] = [
   "canceled",
   "feedback_submitted",
 ];
+
+/** Response shape of GET /api/admin/statistics */
+export type AdminStatistics = {
+  mentees: {
+    totalMentees: number;
+    totalDualRole: number;
+  };
+  mentors: {
+    activeMentors: number;
+    totalMentors: number;
+  };
+  meetings: {
+    byStatus: Record<MeetingStatus, number>;
+    thisWeek: number;
+    thisMonth: number;
+  };
+  feedback: {
+    responseRate: number;
+    averageRating: number | null;
+  };
+  demand: {
+    topTopics: Array<{ name: string; count: number }>;
+    topTechStacks: Array<{ name: string; count: number }>;
+    topProgrammingLanguages: Array<{ name: string; count: number }>;
+  };
+  bottlenecks: {
+    cancellationRate: number;
+    mentorsAtCapacity: number;
+  };
+  growth: {
+    newUsersThisMonth: number;
+    mentorToMenteeRatio: number;
+  };
+};
