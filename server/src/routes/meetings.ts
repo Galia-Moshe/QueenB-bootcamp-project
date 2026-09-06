@@ -369,6 +369,12 @@ router.patch("/:id/reject", requireAuth, async (req: AuthRequest, res, next) => 
       return res.status(409).json({ error: "הבקשה כבר טופלה" });
     }
 
+    await Notification.create({
+      recipient: canceledMeeting.menteeId,
+      type: "meeting_rejected",
+      message: `בקשתך לפגישה בתאריך ${formatWindowDate(releasedWindow.date)} בשעה ${releasedWindow.startTime}–${releasedWindow.endTime} נדחתה`,
+    });
+
     const populatedMeeting = await Meeting.findById(canceledMeeting._id)
       .populate("mentorId", "-passwordHash")
       .populate("menteeId", "-passwordHash")
@@ -436,6 +442,12 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
       );
       return res.status(409).json({ error: "הפגישה כבר טופלה" });
     }
+
+    await Notification.create({
+      recipient: canceledMeeting.mentorId,
+      type: "meeting_canceled",
+      message: `המנטית ביטלה את הפגישה בתאריך ${formatWindowDate(releasedWindow.date)} בשעה ${releasedWindow.startTime}–${releasedWindow.endTime}`,
+    });
 
     const populatedMeeting = await Meeting.findById(canceledMeeting._id)
       .populate("mentorId", "-passwordHash")
