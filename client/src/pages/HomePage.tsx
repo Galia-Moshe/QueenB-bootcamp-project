@@ -18,11 +18,12 @@ import {
   Typography,
 } from "@mui/material";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import EventBusyIcon from "@mui/icons-material/EventBusy";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../api";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
-import type { Meeting, MentorProfile } from "../types";
+import type { AvailabilityWindow, Meeting, MentorProfile } from "../types";
 import { statusLabels } from "../types";
 
 type MeetingRole = "mentee" | "mentor";
@@ -32,6 +33,17 @@ function formatDateTime(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatWindowDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function getAvailabilityWindow(meeting: Meeting): AvailabilityWindow | null {
+  return meeting.availabilityWindowId && typeof meeting.availabilityWindowId !== "string"
+    ? meeting.availabilityWindowId
+    : null;
 }
 
 function otherParticipantName(meeting: Meeting, role: MeetingRole) {
@@ -52,7 +64,11 @@ function PendingMeetingCard({
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const canPropose = role === "mentor" && meeting.status === "pending_mentor_times";
+  const availabilityWindow = getAvailabilityWindow(meeting);
+  const isNewFlowMentorView = role === "mentor" && Boolean(availabilityWindow);
+
+  const canPropose =
+    role === "mentor" && meeting.status === "pending_mentor_times" && !availabilityWindow;
   const canSelect = role === "mentee" && meeting.status === "pending_mentee_selection";
 
   const proposeTimes = async () => {
@@ -92,10 +108,39 @@ function PendingMeetingCard({
           <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
             {otherParticipantName(meeting, role)}
           </Typography>
-          <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+          <Chip
+            label={isNewFlowMentorView ? "ממתינה לאישור" : statusLabels[meeting.status]}
+            size="small"
+            color="primary"
+            variant="outlined"
+          />
         </Stack>
 
         {error && <Alert severity="error">{error}</Alert>}
+
+        {isNewFlowMentorView && availabilityWindow && (
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                {formatWindowDate(availabilityWindow.date)}
+              </Typography>
+              <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 800 }}>
+                {availabilityWindow.startTime}–{availabilityWindow.endTime}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Button variant="contained" startIcon={<EventAvailableIcon />} disabled>
+                אישור פגישה
+              </Button>
+              <Button variant="outlined" color="error" startIcon={<EventBusyIcon />} disabled>
+                דחיית בקשה
+              </Button>
+            </Stack>
+            <Typography variant="caption" color="text.secondary">
+              אישור ודחייה יתאפשרו בשלב הבא.
+            </Typography>
+          </Stack>
+        )}
 
         {canPropose && (
           <Stack spacing={1.5}>
@@ -149,7 +194,7 @@ function PendingMeetingCard({
           </Stack>
         )}
 
-        {!canPropose && !canSelect && (
+        {!canPropose && !canSelect && !isNewFlowMentorView && (
           <Typography variant="body2" color="text.secondary">
             הפגישה עדיין לא נקבעה ביומן.
           </Typography>

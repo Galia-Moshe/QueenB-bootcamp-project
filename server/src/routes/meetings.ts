@@ -26,6 +26,7 @@ function populateMeeting(query: ReturnType<typeof Meeting.find>) {
   return query
     .populate("mentorId", "-passwordHash")
     .populate("menteeId", "-passwordHash")
+    .populate("availabilityWindowId")
     .sort({ updatedAt: -1 });
 }
 
