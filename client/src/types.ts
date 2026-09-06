@@ -59,7 +59,7 @@ export type Meeting = {
   selectedTime?: string;
   rescheduleAttempts: number;
   feedbacks: Array<{
-    fromUserId: string;
+    fromUserId: User | string;
     role: "mentor" | "mentee";
     content: string;
   }>;

@@ -20,7 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import { api, getApiErrorMessage } from "../../api";
-import type { Meeting, MeetingStatus } from "../../types";
+import type { Meeting, MeetingStatus, User } from "../../types";
 import { meetingStatusOptions, statusColors, statusLabels } from "../../types";
 import { MeetingDetailsModal } from "./MeetingDetailsModal";
 
@@ -92,7 +92,9 @@ function groupMeetingsByDate(meetings: Meeting[]): MeetingsByDate {
 
 export function AdminSystemCalendar() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [mentors, setMentors] = useState<User[]>([]);
   const [status, setStatus] = useState<MeetingStatus | "">("");
+  const [mentorId, setMentorId] = useState("");
   const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -126,22 +128,48 @@ export function AdminSystemCalendar() {
       if (status) {
         params.set("status", status);
       }
+      if (mentorId) {
+        params.set("mentorId", mentorId);
+      }
 
       const query = params.toString();
-      const response = await api.get<{ meetings: Meeting[] }>(
+      const meetingsResponse = await api.get<{ meetings: Meeting[] }>(
         `/admin/meetings${query ? `?${query}` : ""}`
       );
-      setMeetings(response.data.meetings);
+      setMeetings(meetingsResponse.data.meetings);
     } catch (err) {
       setError(getApiErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [status]);
+  }, [status, mentorId]);
 
   useEffect(() => {
     loadMeetings();
   }, [loadMeetings]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api
+      .get<{ users: User[] }>("/admin/users")
+      .then((response) => {
+        if (!cancelled) {
+          setMentors(
+            [...response.data.users].sort((a, b) => a.username.localeCompare(b.username, "he"))
+          );
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(getApiErrorMessage(err));
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const calendarEvents = useMemo(
     () =>
@@ -157,7 +185,7 @@ export function AdminSystemCalendar() {
             title: `${meeting.mentorId.username} & ${meeting.menteeId.username}`,
             start,
             backgroundColor: statusColors[meeting.status],
-            borderColor: "transparent",
+            borderColor: statusColors[meeting.status],
             textColor: "#ffffff",
           };
         })
@@ -169,33 +197,52 @@ export function AdminSystemCalendar() {
 
   return (
     <Stack spacing={2}>
-      <FormControl sx={{ minWidth: 220, maxWidth: 320 }} size="small">
-        <InputLabel id="admin-meeting-status-filter">סטטוס</InputLabel>
-        <Select
-          labelId="admin-meeting-status-filter"
-          label="סטטוס"
-          value={status}
-          onChange={(event) => setStatus(event.target.value as MeetingStatus | "")}
-        >
-          <MenuItem value="">כל הסטטוסים</MenuItem>
-          {meetingStatusOptions.map((option) => (
-            <MenuItem key={option} value={option}>
-              <Stack direction="row" spacing={1} alignItems="center">
-                <Box
-                  sx={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: "50%",
-                    bgcolor: statusColors[option],
-                    flexShrink: 0,
-                  }}
-                />
-                <span>{statusLabels[option]}</span>
-              </Stack>
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} useFlexGap flexWrap="wrap">
+        <FormControl sx={{ minWidth: 220, maxWidth: 320 }} size="small">
+          <InputLabel id="admin-meeting-status-filter">סטטוס</InputLabel>
+          <Select
+            labelId="admin-meeting-status-filter"
+            label="סטטוס"
+            value={status}
+            onChange={(event) => setStatus(event.target.value as MeetingStatus | "")}
+          >
+            <MenuItem value="">כל הסטטוסים</MenuItem>
+            {meetingStatusOptions.map((option) => (
+              <MenuItem key={option} value={option}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: statusColors[option],
+                      flexShrink: 0,
+                    }}
+                  />
+                  <span>{statusLabels[option]}</span>
+                </Stack>
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <FormControl sx={{ minWidth: 220, maxWidth: 320 }} size="small">
+          <InputLabel id="admin-meeting-mentor-filter">מנטורית</InputLabel>
+          <Select
+            labelId="admin-meeting-mentor-filter"
+            label="מנטורית"
+            value={mentorId}
+            onChange={(event) => setMentorId(event.target.value)}
+          >
+            <MenuItem value="">כל המנטוריות</MenuItem>
+            {mentors.map((mentor) => (
+              <MenuItem key={mentor._id} value={mentor._id}>
+                {mentor.username}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+      </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
 
@@ -239,6 +286,7 @@ export function AdminSystemCalendar() {
               locale={heLocale}
               direction="rtl"
               height="auto"
+              eventDisplay="block"
               displayEventTime={false}
               events={calendarEvents}
               eventClick={handleEventClick}
@@ -259,7 +307,7 @@ export function AdminSystemCalendar() {
                   פגישות לפי תאריך
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  הרשימה והיומן מסוננים לפי אותו סטטוס. לחצי על פגישה לפרטים.
+                  הרשימה והיומן מסוננים לפי אותו סטטוס ומנטורית. לחצי על פגישה לפרטים.
                 </Typography>
               </Box>
 
