@@ -20,6 +20,7 @@ export type MeetingDocument = {
   _id: Types.ObjectId;
   mentorId: Types.ObjectId;
   menteeId: Types.ObjectId;
+  availabilityWindowId?: Types.ObjectId;
   status: MeetingStatus;
   proposedTimes: Date[];
   selectedTime?: Date;
@@ -60,6 +61,10 @@ const meetingSchema = new Schema<MeetingDocument>(
       type: Schema.Types.ObjectId,
       ref: "User",
       required: true,
+    },
+    availabilityWindowId: {
+      type: Schema.Types.ObjectId,
+      ref: "AvailabilityWindow",
     },
     status: {
       type: String,

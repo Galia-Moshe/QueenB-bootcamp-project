@@ -8,16 +8,14 @@ type MentorCardProps = {
   profile: MentorProfile;
   mentor: User | null;
   isCurrentUser: boolean;
-  requesting: boolean;
-  onRequestMeeting: (mentor: User) => void;
+  onOpenAvailability: (mentor: User) => void;
 };
 
 export default function MentorCard({
   profile,
   mentor,
   isCurrentUser,
-  requesting,
-  onRequestMeeting,
+  onOpenAvailability,
 }: MentorCardProps) {
   return (
     <SurfaceCard sx={{ p: 2.5, height: "100%" }}>
@@ -59,8 +57,8 @@ export default function MentorCard({
         <Button
           variant="contained"
           startIcon={<CalendarMonthIcon />}
-          disabled={!mentor || isCurrentUser || requesting}
-          onClick={() => mentor && onRequestMeeting(mentor)}
+          disabled={!mentor || isCurrentUser}
+          onClick={() => mentor && onOpenAvailability(mentor)}
         >
           {isCurrentUser ? "זו את" : "בקשת פגישה"}
         </Button>
