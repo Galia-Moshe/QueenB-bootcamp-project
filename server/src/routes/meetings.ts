@@ -394,8 +394,11 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
       return res.status(404).json({ error: "הפגישה לא נמצאה" });
     }
 
-    if (!isSameId(meeting.menteeId, req.user!._id)) {
-      return res.status(403).json({ error: "רק המנטית של הפגישה יכולה לבטל אותה" });
+    const isMentee = isSameId(meeting.menteeId, req.user!._id);
+    const isMentor = isSameId(meeting.mentorId, req.user!._id);
+
+    if (!isMentee && !isMentor) {
+      return res.status(403).json({ error: "אין לך הרשאה לבטל את הפגישה הזו" });
     }
 
     if (meeting.status !== "scheduled") {
@@ -444,9 +447,11 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
     }
 
     await Notification.create({
-      recipient: canceledMeeting.mentorId,
+      recipient: isMentee ? canceledMeeting.mentorId : canceledMeeting.menteeId,
       type: "meeting_canceled",
-      message: `המנטית ביטלה את הפגישה בתאריך ${formatWindowDate(releasedWindow.date)} בשעה ${releasedWindow.startTime}–${releasedWindow.endTime}`,
+      message: isMentee
+        ? `המנטית ביטלה את הפגישה בתאריך ${formatWindowDate(releasedWindow.date)} בשעה ${releasedWindow.startTime}–${releasedWindow.endTime}`
+        : `המנטורית ביטלה את הפגישה בתאריך ${formatWindowDate(releasedWindow.date)} בשעה ${releasedWindow.startTime}–${releasedWindow.endTime}`,
     });
 
     const populatedMeeting = await Meeting.findById(canceledMeeting._id)

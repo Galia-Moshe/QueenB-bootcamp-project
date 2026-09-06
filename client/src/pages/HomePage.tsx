@@ -312,17 +312,15 @@ function ScheduledMeetingCard({
           </Box>
         )}
 
-        {role === "mentee" && (
-          <Button
-            variant="outlined"
-            color="error"
-            startIcon={<EventBusyIcon />}
-            disabled={canceling}
-            onClick={cancelMeeting}
-          >
-            {canceling ? "מבטלת..." : "ביטול פגישה"}
-          </Button>
-        )}
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<EventBusyIcon />}
+          disabled={canceling}
+          onClick={cancelMeeting}
+        >
+          {canceling ? "מבטלת..." : "ביטול פגישה"}
+        </Button>
       </Stack>
     </SurfaceCard>
   );
