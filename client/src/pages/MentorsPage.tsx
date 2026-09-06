@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import MentorAvailabilityModal from "../components/mentors/MentorAvailabilityModal";
 import MentorCard from "../components/mentors/MentorCard";
 import CenteredContent from "../components/ui/CenteredContent";
 import PageHero from "../components/ui/PageHero";
@@ -23,8 +24,7 @@ export default function MentorsPage() {
   const [mentors, setMentors] = useState<MentorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [requestingId, setRequestingId] = useState("");
+  const [selectedMentor, setSelectedMentor] = useState<User | null>(null);
 
   const loadMentors = async () => {
     setLoading(true);
@@ -44,27 +44,11 @@ export default function MentorsPage() {
     loadMentors();
   }, []);
 
-  const requestMeeting = async (mentor: User) => {
-    setError("");
-    setSuccess("");
-    setRequestingId(mentor._id);
-
-    try {
-      await api.post("/meetings", { mentorId: mentor._id });
-      setSuccess(`הבקשה נשלחה אל ${mentor.username}`);
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setRequestingId("");
-    }
-  };
-
   return (
     <Stack spacing={3} sx={{ width: "100%" }}>
-      <PageHero title="מנטוריות" description="בחרי מנטורית ושלחי בקשה לפגישה." />
+      <PageHero title="מנטוריות" description="בחרי מנטורית וצפי בזמנים הפנויים שלה." />
 
       {error && <Alert severity="error">{error}</Alert>}
-      {success && <Alert severity="success">{success}</Alert>}
 
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 280 }}>
@@ -95,13 +79,18 @@ export default function MentorsPage() {
                 profile={profile}
                 mentor={mentor}
                 isCurrentUser={isCurrentUser}
-                requesting={requestingId === mentor?._id}
-                onRequestMeeting={requestMeeting}
+                onOpenAvailability={setSelectedMentor}
               />
             );
           })}
         </CenteredContent>
       )}
+
+      <MentorAvailabilityModal
+        open={Boolean(selectedMentor)}
+        mentor={selectedMentor}
+        onClose={() => setSelectedMentor(null)}
+      />
     </Stack>
   );
 }

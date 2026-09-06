@@ -30,13 +30,15 @@ export type MentorProfile = {
   updatedAt?: string;
 };
 
+export type AvailabilityWindowStatus = "available" | "pending" | "booked";
+
 export type AvailabilityWindow = {
   _id: string;
   mentorId: string;
   date: string;
   startTime: string;
   endTime: string;
-  meetingLength: number;
+  status: AvailabilityWindowStatus;
   createdAt?: string;
   updatedAt?: string;
 };
