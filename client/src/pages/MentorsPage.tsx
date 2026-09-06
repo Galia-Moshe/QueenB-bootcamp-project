@@ -14,6 +14,7 @@ import FilterListIcon from "@mui/icons-material/FilterList";
 import SearchIcon from "@mui/icons-material/Search";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
+import MentorAvailabilityModal from "../components/mentors/MentorAvailabilityModal";
 import MentorCard from "../components/mentors/MentorCard";
 import MentorFiltersDrawer, {
   DEFAULT_YEARS_RANGE,
@@ -91,7 +92,7 @@ export default function MentorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const [requestingId, setRequestingId] = useState("");
+  const [selectedMentor, setSelectedMentor] = useState<User | null>(null);
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -157,21 +158,6 @@ export default function MentorsPage() {
     };
   }, [debouncedSearch, filters, page]);
 
-  const requestMeeting = async (mentor: User) => {
-    setError("");
-    setSuccess("");
-    setRequestingId(mentor._id);
-
-    try {
-      await api.post("/meetings", { mentorId: mentor._id });
-      setSuccess(`הבקשה נשלחה אל ${mentor.username}`);
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setRequestingId("");
-    }
-  };
-
   const openFilters = () => {
     setDraftFilters(filters);
     setFiltersOpen(true);
@@ -196,7 +182,7 @@ export default function MentorsPage() {
 
   return (
     <Stack spacing={3} sx={{ width: "100%" }}>
-      <PageHero title="מנטוריות" description="בחרי מנטורית ושלחי בקשה לפגישה." />
+      <PageHero title="מנטוריות" description="בחרי מנטורית וצפי בזמנים הפנויים שלה." />
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} alignItems={{ sm: "center" }}>
         <TextField
@@ -255,8 +241,7 @@ export default function MentorsPage() {
                   profile={profile}
                   mentor={mentor}
                   isCurrentUser={isCurrentUser}
-                  requesting={requestingId === mentor?._id}
-                  onRequestMeeting={requestMeeting}
+                  onOpenAvailability={setSelectedMentor}
                 />
               );
             })}
@@ -282,6 +267,16 @@ export default function MentorsPage() {
         onDraftChange={setDraftFilters}
         onApply={applyFilters}
         onClearFilters={clearAllFilters}
+      />
+
+      <MentorAvailabilityModal
+        open={Boolean(selectedMentor)}
+        mentor={selectedMentor}
+        onClose={() => setSelectedMentor(null)}
+        onBooked={() => {
+          setSuccess(`הבקשה נשלחה אל ${selectedMentor?.username}`);
+          setSelectedMentor(null);
+        }}
       />
     </Stack>
   );

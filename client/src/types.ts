@@ -38,13 +38,15 @@ export type MentorsPagination = {
   totalPages: number;
 };
 
+export type AvailabilityWindowStatus = "available" | "pending" | "booked";
+
 export type AvailabilityWindow = {
   _id: string;
   mentorId: string;
   date: string;
   startTime: string;
   endTime: string;
-  meetingLength: number;
+  status: AvailabilityWindowStatus;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -62,6 +64,7 @@ export type Meeting = {
   _id: string;
   mentorId: User;
   menteeId: User;
+  availabilityWindowId?: AvailabilityWindow | string;
   status: MeetingStatus;
   proposedTimes: string[];
   selectedTime?: string;
@@ -75,9 +78,25 @@ export type Meeting = {
   updatedAt?: string;
 };
 
+export type NotificationType =
+  | "new_meeting_request"
+  | "meeting_approved"
+  | "meeting_rejected"
+  | "meeting_canceled";
+
+export type NotificationItem = {
+  _id: string;
+  recipient: string;
+  type: NotificationType;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export const statusLabels: Record<MeetingStatus, string> = {
-  pending_mentor_times: "ממתינה להצעת זמנים",
-  pending_mentee_selection: "ממתינה לבחירת זמן",
+  pending_mentor_times: "ממתינה לאישור",
+  pending_mentee_selection: "ממתינה לאישור",
   scheduled: "פגישה נקבעה",
   attendance_confirmed: "הגעה אושרה",
   completed: "התקיימה פגישה",
@@ -105,3 +124,37 @@ export const meetingStatusOptions: MeetingStatus[] = [
   "canceled",
   "feedback_submitted",
 ];
+
+/** Response shape of GET /api/admin/statistics */
+export type AdminStatistics = {
+  mentees: {
+    totalMentees: number;
+    totalDualRole: number;
+  };
+  mentors: {
+    activeMentors: number;
+    totalMentors: number;
+  };
+  meetings: {
+    byStatus: Record<MeetingStatus, number>;
+    thisWeek: number;
+    thisMonth: number;
+  };
+  feedback: {
+    responseRate: number;
+    averageRating: number | null;
+  };
+  demand: {
+    topTopics: Array<{ name: string; count: number }>;
+    topTechStacks: Array<{ name: string; count: number }>;
+    topProgrammingLanguages: Array<{ name: string; count: number }>;
+  };
+  bottlenecks: {
+    cancellationRate: number;
+    mentorsAtCapacity: number;
+  };
+  growth: {
+    newUsersThisMonth: number;
+    mentorToMenteeRatio: number;
+  };
+};

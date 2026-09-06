@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import FullCalendar from "@fullcalendar/react";
+import type { EventClickArg } from "@fullcalendar/core";
+import type { DateClickArg } from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import timeGridPlugin from "@fullcalendar/timegrid";
@@ -18,11 +21,12 @@ import {
   Typography,
 } from "@mui/material";
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
+import EventBusyIcon from "@mui/icons-material/EventBusy";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../api";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
-import type { Meeting, MentorProfile } from "../types";
+import type { AvailabilityWindow, Meeting, MentorProfile } from "../types";
 import { statusLabels } from "../types";
 
 type MeetingRole = "mentee" | "mentor";
@@ -32,6 +36,23 @@ function formatDateTime(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatWindowDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-");
+  return `${day}/${month}/${year}`;
+}
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function getAvailabilityWindow(meeting: Meeting): AvailabilityWindow | null {
+  return meeting.availabilityWindowId && typeof meeting.availabilityWindowId !== "string"
+    ? meeting.availabilityWindowId
+    : null;
 }
 
 function otherParticipantName(meeting: Meeting, role: MeetingRole) {
@@ -45,15 +66,61 @@ function PendingMeetingCard({
 }: {
   meeting: Meeting;
   role: MeetingRole;
-  onChanged: () => void;
+  onChanged: (message?: string, severity?: "success" | "error") => void;
 }) {
   const [times, setTimes] = useState(["", "", ""]);
   const [selectedTime, setSelectedTime] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
 
-  const canPropose = role === "mentor" && meeting.status === "pending_mentor_times";
+  const availabilityWindow = getAvailabilityWindow(meeting);
+  const isNewFlowMentorView = role === "mentor" && Boolean(availabilityWindow);
+
+  const canPropose =
+    role === "mentor" && meeting.status === "pending_mentor_times" && !availabilityWindow;
   const canSelect = role === "mentee" && meeting.status === "pending_mentee_selection";
+
+  const approveMeeting = async () => {
+    if (approving || rejecting) return;
+
+    setError("");
+    setApproving(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/approve`);
+      onChanged("הפגישה אושרה ונקבעה בהצלחה", "success");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        onChanged("הבקשה הזו כבר טופלה. הרשימה עודכנה.", "error");
+      } else {
+        setError(getApiErrorMessage(err));
+      }
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  const rejectMeeting = async () => {
+    if (approving || rejecting) return;
+
+    setError("");
+    setRejecting(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/reject`);
+      onChanged("הבקשה נדחתה והמועד פתוח שוב לקביעה", "success");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        onChanged("הבקשה הזו כבר טופלה. הרשימה עודכנה.", "error");
+      } else {
+        setError(getApiErrorMessage(err));
+      }
+    } finally {
+      setRejecting(false);
+    }
+  };
 
   const proposeTimes = async () => {
     setError("");
@@ -92,10 +159,47 @@ function PendingMeetingCard({
           <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
             {otherParticipantName(meeting, role)}
           </Typography>
-          <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+          <Chip
+            label={isNewFlowMentorView ? "ממתינה לאישור" : statusLabels[meeting.status]}
+            size="small"
+            color="primary"
+            variant="outlined"
+          />
         </Stack>
 
         {error && <Alert severity="error">{error}</Alert>}
+
+        {isNewFlowMentorView && availabilityWindow && (
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                {formatWindowDate(availabilityWindow.date)}
+              </Typography>
+              <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 800 }}>
+                {availabilityWindow.startTime}–{availabilityWindow.endTime}
+              </Typography>
+            </Box>
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="contained"
+                startIcon={<EventAvailableIcon />}
+                disabled={approving || rejecting}
+                onClick={approveMeeting}
+              >
+                {approving ? "מאשרת..." : "אישור פגישה"}
+              </Button>
+              <Button
+                variant="outlined"
+                color="error"
+                startIcon={<EventBusyIcon />}
+                disabled={approving || rejecting}
+                onClick={rejectMeeting}
+              >
+                {rejecting ? "דוחה..." : "דחיית בקשה"}
+              </Button>
+            </Stack>
+          </Stack>
+        )}
 
         {canPropose && (
           <Stack spacing={1.5}>
@@ -149,11 +253,82 @@ function PendingMeetingCard({
           </Stack>
         )}
 
-        {!canPropose && !canSelect && (
+        {!canPropose && !canSelect && !isNewFlowMentorView && (
           <Typography variant="body2" color="text.secondary">
             הפגישה עדיין לא נקבעה ביומן.
           </Typography>
         )}
+      </Stack>
+    </SurfaceCard>
+  );
+}
+
+function ScheduledMeetingCard({
+  meeting,
+  role,
+  onChanged,
+}: {
+  meeting: Meeting;
+  role: MeetingRole;
+  onChanged: (message?: string, severity?: "success" | "error") => void;
+}) {
+  const [error, setError] = useState("");
+  const [canceling, setCanceling] = useState(false);
+
+  const availabilityWindow = getAvailabilityWindow(meeting);
+
+  const cancelMeeting = async () => {
+    if (canceling) return;
+
+    setError("");
+    setCanceling(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/cancel`);
+      onChanged("הפגישה בוטלה בהצלחה", "success");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        onChanged("הפגישה הזו כבר טופלה. הרשימה עודכנה.", "error");
+      } else {
+        setError(getApiErrorMessage(err));
+      }
+    } finally {
+      setCanceling(false);
+    }
+  };
+
+  return (
+    <SurfaceCard variant="outlined" muted shadow={false}>
+      <Stack spacing={1.5}>
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+          <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
+            {otherParticipantName(meeting, role)}
+          </Typography>
+          <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+        </Stack>
+
+        {error && <Alert severity="error">{error}</Alert>}
+
+        {availabilityWindow && (
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              {formatWindowDate(availabilityWindow.date)}
+            </Typography>
+            <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 800 }}>
+              {availabilityWindow.startTime}–{availabilityWindow.endTime}
+            </Typography>
+          </Box>
+        )}
+
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<EventBusyIcon />}
+          disabled={canceling}
+          onClick={cancelMeeting}
+        >
+          {canceling ? "מבטלת..." : "ביטול פגישה"}
+        </Button>
       </Stack>
     </SurfaceCard>
   );
@@ -165,6 +340,10 @@ export default function HomePage() {
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [actionMessage, setActionMessage] = useState<{ text: string; severity: "success" | "error" } | null>(
+    null
+  );
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
   const loadMeetings = useCallback(async (meetingRole: MeetingRole) => {
     setError("");
@@ -185,25 +364,63 @@ export default function HomePage() {
     }
   }, []);
 
+  const handleMeetingChanged = useCallback(
+    (message?: string, severity: "success" | "error" = "success") => {
+      setActionMessage(message ? { text: message, severity } : null);
+      loadMeetings(role);
+    },
+    [role, loadMeetings]
+  );
+
   useEffect(() => {
+    setActionMessage(null);
+    setSelectedDate(null);
     loadMeetings(role);
   }, [role, loadMeetings]);
 
   const scheduledEvents = useMemo(
     () =>
       meetings
-        .filter((meeting) => Boolean(meeting.selectedTime))
-        .map((meeting) => ({
-          id: meeting._id,
-          title: `${otherParticipantName(meeting, role)} - ${statusLabels[meeting.status]}`,
-          start: meeting.selectedTime,
-          backgroundColor: meeting.status === "scheduled" ? "#d81b60" : "#ad1457",
-          borderColor: "transparent",
-        })),
+        .filter((meeting) => meeting.status === "scheduled")
+        .map((meeting) => {
+          const availabilityWindow = getAvailabilityWindow(meeting);
+          const participantName = otherParticipantName(meeting, role);
+
+          if (availabilityWindow) {
+            return {
+              id: meeting._id,
+              title: `${availabilityWindow.startTime}–${availabilityWindow.endTime} פגישה עם ${participantName}`,
+              start: `${availabilityWindow.date}T${availabilityWindow.startTime}:00`,
+              end: `${availabilityWindow.date}T${availabilityWindow.endTime}:00`,
+              allDay: false,
+              backgroundColor: "#d81b60",
+              borderColor: "transparent",
+            };
+          }
+
+          return {
+            id: meeting._id,
+            title: `פגישה עם ${participantName}`,
+            start: meeting.selectedTime,
+            backgroundColor: "#d81b60",
+            borderColor: "transparent",
+          };
+        }),
     [meetings, role]
   );
 
-  const pendingMeetings = meetings.filter((meeting) => !meeting.selectedTime);
+  const pendingMeetings = meetings.filter(
+    (meeting) => !meeting.selectedTime && meeting.status !== "canceled"
+  );
+
+  const scheduledMeetingsList = meetings.filter(
+    (meeting) => meeting.status === "scheduled" && Boolean(getAvailabilityWindow(meeting))
+  );
+
+  const selectedDayMeetings = selectedDate
+    ? scheduledMeetingsList.filter((meeting) => getAvailabilityWindow(meeting)?.date === selectedDate)
+    : [];
+
   const canSwitchRoles = Boolean(mentorProfile);
 
   return (
@@ -234,6 +451,7 @@ export default function HomePage() {
       />
 
       {error && <Alert severity="error">{error}</Alert>}
+      {actionMessage && <Alert severity={actionMessage.severity}>{actionMessage.text}</Alert>}
 
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 320 }}>
@@ -241,7 +459,25 @@ export default function HomePage() {
         </Box>
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "2fr 1fr" }, gap: 3 }}>
-          <SurfaceCard sx={{ overflow: "hidden" }}>
+          <SurfaceCard
+            sx={{
+              overflow: "hidden",
+              "& .fc-daygrid-day-frame": {
+                cursor: "pointer",
+                transition: "background-color 0.15s ease",
+              },
+              "& .fc-daygrid-day-frame:hover": {
+                backgroundColor: "rgba(236, 64, 122, 0.08)",
+              },
+              "& .fc-event": {
+                cursor: "pointer",
+              },
+              "& .fc-day-selected .fc-daygrid-day-frame": {
+                backgroundColor: "rgba(216, 27, 96, 0.16)",
+                boxShadow: "inset 0 0 0 2px #d81b60",
+              },
+            }}
+          >
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
@@ -260,6 +496,14 @@ export default function HomePage() {
               direction="rtl"
               height="auto"
               events={scheduledEvents}
+              displayEventTime={false}
+              dateClick={(arg: DateClickArg) => setSelectedDate(toDateKey(arg.date))}
+              eventClick={(arg: EventClickArg) => {
+                if (arg.event.start) {
+                  setSelectedDate(toDateKey(arg.event.start));
+                }
+              }}
+              dayCellClassNames={(arg) => (toDateKey(arg.date) === selectedDate ? ["fc-day-selected"] : [])}
             />
           </SurfaceCard>
 
@@ -284,9 +528,64 @@ export default function HomePage() {
                     key={meeting._id}
                     meeting={meeting}
                     role={role}
-                    onChanged={() => loadMeetings(role)}
+                    onChanged={handleMeetingChanged}
                   />
                 ))
+              )}
+
+              {(selectedDate || scheduledMeetingsList.length > 0) && (
+                <>
+                  <Divider />
+                  {selectedDate ? (
+                    <>
+                      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" spacing={1}>
+                        <Box>
+                          <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                            הפגישות ב־{formatWindowDate(selectedDate)}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
+                          </Typography>
+                        </Box>
+                        <Button size="small" onClick={() => setSelectedDate(null)}>
+                          הצג את כל הפגישות
+                        </Button>
+                      </Stack>
+
+                      {selectedDayMeetings.length === 0 ? (
+                        <Typography color="text.secondary">אין פגישות מתוזמנות ביום זה.</Typography>
+                      ) : (
+                        selectedDayMeetings.map((meeting) => (
+                          <ScheduledMeetingCard
+                            key={meeting._id}
+                            meeting={meeting}
+                            role={role}
+                            onChanged={handleMeetingChanged}
+                          />
+                        ))
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Box>
+                        <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                          הפגישות המתוזמנות שלי
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {role === "mentee" ? "ניתן לבטל פגישה שנקבעה" : "פגישות שאושרו וממתינות להתקיים"}
+                        </Typography>
+                      </Box>
+                      {scheduledMeetingsList.map((meeting) => (
+                        <ScheduledMeetingCard
+                          key={meeting._id}
+                          meeting={meeting}
+                          role={role}
+                          onChanged={handleMeetingChanged}
+                        />
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </Stack>
           </SurfaceCard>
