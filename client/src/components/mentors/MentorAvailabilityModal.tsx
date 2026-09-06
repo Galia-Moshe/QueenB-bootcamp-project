@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import FullCalendar from "@fullcalendar/react";
 import type { EventClickArg } from "@fullcalendar/core";
 import heLocale from "@fullcalendar/core/locales/he";
@@ -18,6 +19,7 @@ import {
   Typography,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
+import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../../api";
 import SurfaceCard from "../ui/SurfaceCard";
 import type { AvailabilityWindow, User } from "../../types";
@@ -35,14 +37,27 @@ type Props = {
   open: boolean;
   mentor: User | null;
   onClose: () => void;
+  onBooked: () => void;
 };
 
-export default function MentorAvailabilityModal({ open, mentor, onClose }: Props) {
+export default function MentorAvailabilityModal({ open, mentor, onClose, onBooked }: Props) {
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
+
+  const fetchAvailability = useCallback(async () => {
+    if (!mentor) return;
+
+    const response = await api.get<{ availabilityWindows: AvailabilityWindow[] }>(
+      `/mentors/${mentor._id}/availability`
+    );
+    setWindows(response.data.availabilityWindows);
+    return response.data.availabilityWindows;
+  }, [mentor]);
 
   useEffect(() => {
     if (!open || !mentor) {
@@ -51,15 +66,14 @@ export default function MentorAvailabilityModal({ open, mentor, onClose }: Props
 
     setLoading(true);
     setLoadError("");
+    setSubmitError("");
     setSelectedDate(null);
     setSelectedWindowId(null);
 
-    api
-      .get<{ availabilityWindows: AvailabilityWindow[] }>(`/mentors/${mentor._id}/availability`)
-      .then((response) => setWindows(response.data.availabilityWindows))
+    fetchAvailability()
       .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [open, mentor]);
+  }, [open, mentor, fetchAvailability]);
 
   const windowsByDate = useMemo(() => {
     const map = new Map<string, AvailabilityWindow[]>();
@@ -101,7 +115,38 @@ export default function MentorAvailabilityModal({ open, mentor, onClose }: Props
   const handleClose = () => {
     setSelectedDate(null);
     setSelectedWindowId(null);
+    setSubmitError("");
     onClose();
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedWindowId || !mentor || submitting) return;
+
+    setSubmitting(true);
+    setSubmitError("");
+
+    try {
+      await api.post("/meetings/from-availability", { availabilityWindowId: selectedWindowId });
+      onBooked();
+    } catch (err) {
+      setSubmitError(getApiErrorMessage(err));
+
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        setSelectedWindowId(null);
+
+        try {
+          const freshWindows = await fetchAvailability();
+          const stillHasSelectedDate = freshWindows?.some((window) => window.date === selectedDate);
+          if (!stillHasSelectedDate) {
+            setSelectedDate(null);
+          }
+        } catch {
+          // best-effort refresh; the conflict message above still explains what happened
+        }
+      }
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -198,11 +243,28 @@ export default function MentorAvailabilityModal({ open, mentor, onClose }: Props
                           key={window._id}
                           variant={selectedWindowId === window._id ? "contained" : "outlined"}
                           onClick={() => setSelectedWindowId(window._id)}
+                          disabled={submitting}
                         >
                           {window.startTime}–{window.endTime}
                         </Button>
                       ))}
                     </Stack>
+
+                    {submitError && (
+                      <Alert severity="error" sx={{ mt: 2 }}>
+                        {submitError}
+                      </Alert>
+                    )}
+
+                    <Button
+                      variant="contained"
+                      startIcon={<SendIcon />}
+                      sx={{ mt: 2 }}
+                      disabled={!selectedWindowId || submitting}
+                      onClick={handleSubmit}
+                    >
+                      {submitting ? "שולחת בקשה..." : "שליחת בקשה"}
+                    </Button>
                   </Box>
                 </>
               )}

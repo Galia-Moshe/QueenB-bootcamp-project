@@ -56,6 +56,7 @@ export type Meeting = {
   _id: string;
   mentorId: User;
   menteeId: User;
+  availabilityWindowId?: AvailabilityWindow | string;
   status: MeetingStatus;
   proposedTimes: string[];
   selectedTime?: string;

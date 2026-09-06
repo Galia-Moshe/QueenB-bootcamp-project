@@ -24,6 +24,7 @@ export default function MentorsPage() {
   const [mentors, setMentors] = useState<MentorProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [selectedMentor, setSelectedMentor] = useState<User | null>(null);
 
   const loadMentors = async () => {
@@ -49,6 +50,7 @@ export default function MentorsPage() {
       <PageHero title="מנטוריות" description="בחרי מנטורית וצפי בזמנים הפנויים שלה." />
 
       {error && <Alert severity="error">{error}</Alert>}
+      {success && <Alert severity="success">{success}</Alert>}
 
       {loading ? (
         <Box sx={{ display: "grid", placeItems: "center", minHeight: 280 }}>
@@ -90,6 +92,10 @@ export default function MentorsPage() {
         open={Boolean(selectedMentor)}
         mentor={selectedMentor}
         onClose={() => setSelectedMentor(null)}
+        onBooked={() => {
+          setSuccess(`הבקשה נשלחה אל ${selectedMentor?.username}`);
+          setSelectedMentor(null);
+        }}
       />
     </Stack>
   );

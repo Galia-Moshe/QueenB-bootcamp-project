@@ -1,5 +1,6 @@
 import { Router } from "express";
 import mongoose from "mongoose";
+import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { Meeting } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
 import { User } from "../models/User";
@@ -56,6 +57,65 @@ router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
       .populate("menteeId", "-passwordHash");
 
     return res.status(201).json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.post("/from-availability", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const { availabilityWindowId } = req.body;
+
+    if (!availabilityWindowId || !mongoose.Types.ObjectId.isValid(availabilityWindowId)) {
+      return res.status(400).json({ error: "יש לבחור מועד תקין" });
+    }
+
+    const availabilityWindow = await AvailabilityWindow.findById(availabilityWindowId);
+    if (!availabilityWindow) {
+      return res.status(404).json({ error: "המועד המבוקש לא נמצא" });
+    }
+
+    if (isSameId(availabilityWindow.mentorId, req.user!._id)) {
+      return res.status(400).json({ error: "אי אפשר לבקש פגישה עם עצמך" });
+    }
+
+    const mentorProfile = await MentorProfile.findOne({ userId: availabilityWindow.mentorId });
+    if (!mentorProfile) {
+      return res.status(404).json({ error: "המנטורית לא נמצאה" });
+    }
+
+    // Atomically claim the slot: only the request that flips available -> pending may proceed.
+    const claimedWindow = await AvailabilityWindow.findOneAndUpdate(
+      { _id: availabilityWindowId, status: "available" },
+      { $set: { status: "pending" } },
+      { new: true }
+    );
+
+    if (!claimedWindow) {
+      return res.status(409).json({ error: "המועד שבחרת כבר נתפס. אנא בחרי מועד אחר." });
+    }
+
+    try {
+      const meeting = await Meeting.create({
+        mentorId: claimedWindow.mentorId,
+        menteeId: req.user!._id,
+        status: "pending_mentor_times",
+        availabilityWindowId: claimedWindow._id,
+      });
+
+      const populatedMeeting = await Meeting.findById(meeting._id)
+        .populate("mentorId", "-passwordHash")
+        .populate("menteeId", "-passwordHash")
+        .populate("availabilityWindowId");
+
+      return res.status(201).json({ meeting: populatedMeeting });
+    } catch (creationError) {
+      await AvailabilityWindow.findOneAndUpdate(
+        { _id: availabilityWindowId, status: "pending" },
+        { $set: { status: "available" } }
+      );
+      throw creationError;
+    }
   } catch (error) {
     next(error);
   }
