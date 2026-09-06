@@ -6,6 +6,7 @@ import jwt from "jsonwebtoken";
 import path from "path";
 import { User } from "../models/User";
 import { MentorProfile } from "../models/MentorProfile";
+import { MenteeProfile } from "../models/MenteeProfile";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { normalizeStringList, sanitizeUser } from "../utils/users";
 
@@ -234,8 +235,12 @@ router.get("/me", requireAuth, async (req: AuthRequest, res) => {
 
 router.get("/me/profile", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const mentorProfile = await MentorProfile.findOne({ userId: req.user!._id });
-    return res.json({ user: sanitizeUser(req.user!), mentorProfile });
+    const [mentorProfile, menteeProfile] = await Promise.all([
+      MentorProfile.findOne({ userId: req.user!._id }),
+      MenteeProfile.findOne({ userId: req.user!._id }),
+    ]);
+
+    return res.json({ user: sanitizeUser(req.user!), mentorProfile, menteeProfile });
   } catch (error) {
     next(error);
   }
@@ -313,10 +318,18 @@ router.patch("/me/profile", requireAuth, async (req: AuthRequest, res, next) => 
       req.user!.passwordHash = await bcrypt.hash(newPassword, 12);
     }
 
-    const mentorProfile = await MentorProfile.findOne({ userId: req.user!._id });
+    const [mentorProfile, existingMenteeProfile] = await Promise.all([
+      MentorProfile.findOne({ userId: req.user!._id }),
+      MenteeProfile.findOne({ userId: req.user!._id }),
+    ]);
+    let menteeProfile = existingMenteeProfile;
     const mentorProfilePayload =
       requestBody.mentorProfile && typeof requestBody.mentorProfile === "object"
         ? (requestBody.mentorProfile as Record<string, unknown>)
+        : null;
+    const menteeProfilePayload =
+      requestBody.menteeProfile && typeof requestBody.menteeProfile === "object"
+        ? (requestBody.menteeProfile as Record<string, unknown>)
         : null;
 
     if (mentorProfile && mentorProfilePayload) {
@@ -360,6 +373,31 @@ router.patch("/me/profile", requireAuth, async (req: AuthRequest, res, next) => 
       await mentorProfile.save();
     }
 
+    if (menteeProfilePayload) {
+      const nextMenteeProfile = {
+        userId: req.user!._id,
+        about: getOptionalString(menteeProfilePayload.about),
+        skills: normalizeStringList(menteeProfilePayload.skills),
+        techStack: normalizeStringList(menteeProfilePayload.techStack),
+        helpTopics: normalizeStringList(menteeProfilePayload.helpTopics),
+        goals: getOptionalString(menteeProfilePayload.goals),
+        experienceLevel: getOptionalString(menteeProfilePayload.experienceLevel),
+      };
+
+      if (menteeProfile) {
+        menteeProfile.about = nextMenteeProfile.about;
+        menteeProfile.skills = nextMenteeProfile.skills;
+        menteeProfile.techStack = nextMenteeProfile.techStack;
+        menteeProfile.helpTopics = nextMenteeProfile.helpTopics;
+        menteeProfile.goals = nextMenteeProfile.goals;
+        menteeProfile.experienceLevel = nextMenteeProfile.experienceLevel;
+
+        await menteeProfile.save();
+      } else {
+        menteeProfile = await MenteeProfile.create(nextMenteeProfile);
+      }
+    }
+
     const previousProfilePicture = req.user!.profilePicture;
 
     if (requestBody.removeProfilePicture === true) {
@@ -390,7 +428,7 @@ router.patch("/me/profile", requireAuth, async (req: AuthRequest, res, next) => 
       await deleteLocalProfileImage(previousProfilePicture);
     }
 
-    return res.json({ user: sanitizeUser(req.user!), mentorProfile });
+    return res.json({ user: sanitizeUser(req.user!), mentorProfile, menteeProfile });
   } catch (error: any) {
     if (uploadedProfilePicture) {
       await deleteLocalProfileImage(uploadedProfilePicture);

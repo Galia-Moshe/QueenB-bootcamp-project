@@ -32,12 +32,13 @@ import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import { MENTOR_TOPIC_OPTIONS } from "../constants/mentorTopics";
-import type { Meeting, MentorProfile, User } from "../types";
+import type { Meeting, MenteeProfile, MentorProfile, User } from "../types";
 import { statusLabels } from "../types";
 
 type ProfileResponse = {
   user: User;
   mentorProfile: MentorProfile | null;
+  menteeProfile: MenteeProfile | null;
 };
 
 type ProfileForm = {
@@ -51,9 +52,12 @@ type ProfileForm = {
   background: string;
   maxMeetings: string;
   meetingLength: string;
+  menteeAbout: string;
+  menteeGoals: string;
+  menteeExperienceLevel: string;
 };
 
-type SectionKey = "picture" | "account" | "password" | "mentor";
+type SectionKey = "picture" | "account" | "password" | "mentor" | "mentee";
 type MeetingRole = "mentee" | "mentor";
 
 type SectionHeaderProps = {
@@ -78,6 +82,9 @@ const EMPTY_FORM: ProfileForm = {
   background: "",
   maxMeetings: "",
   meetingLength: "",
+  menteeAbout: "",
+  menteeGoals: "",
+  menteeExperienceLevel: "",
 };
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -103,7 +110,11 @@ function otherParticipantName(meeting: Meeting, role: MeetingRole) {
   return role === "mentor" ? meeting.menteeId.username : meeting.mentorId.username;
 }
 
-function buildForm(user: User, mentorProfile: MentorProfile | null): ProfileForm {
+function buildForm(
+  user: User,
+  mentorProfile: MentorProfile | null,
+  menteeProfile: MenteeProfile | null
+): ProfileForm {
   return {
     username: user.username || "",
     email: user.email || "",
@@ -115,6 +126,9 @@ function buildForm(user: User, mentorProfile: MentorProfile | null): ProfileForm
     background: mentorProfile?.background || "",
     maxMeetings: numberToField(mentorProfile?.maxMeetings),
     meetingLength: numberToField(mentorProfile?.meetingLength),
+    menteeAbout: menteeProfile?.about || "",
+    menteeGoals: menteeProfile?.goals || "",
+    menteeExperienceLevel: menteeProfile?.experienceLevel || "",
   };
 }
 
@@ -424,9 +438,13 @@ export default function ProfilePage() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM);
   const [mentorProfile, setMentorProfile] = useState<MentorProfile | null>(null);
+  const [menteeProfile, setMenteeProfile] = useState<MenteeProfile | null>(null);
   const [programmingLanguages, setProgrammingLanguages] = useState<string[]>([]);
   const [techStack, setTechStack] = useState<string[]>([]);
   const [topics, setTopics] = useState<string[]>([]);
+  const [menteeSkills, setMenteeSkills] = useState<string[]>([]);
+  const [menteeTechStack, setMenteeTechStack] = useState<string[]>([]);
+  const [helpTopics, setHelpTopics] = useState<string[]>([]);
   const [profilePicture, setProfilePicture] = useState("");
   const [profilePicturePreview, setProfilePicturePreview] = useState("");
   const [profilePictureUpload, setProfilePictureUpload] = useState("");
@@ -450,11 +468,15 @@ export default function ProfilePage() {
 
   const applyProfileResponse = (response: ProfileResponse) => {
     setProfileUser(response.user);
-    setForm(buildForm(response.user, response.mentorProfile));
+    setForm(buildForm(response.user, response.mentorProfile, response.menteeProfile));
     setMentorProfile(response.mentorProfile);
+    setMenteeProfile(response.menteeProfile);
     setProgrammingLanguages(response.user.programmingLanguages || []);
     setTechStack(response.user.techStack || []);
     setTopics(response.mentorProfile?.topics || []);
+    setMenteeSkills(response.menteeProfile?.skills || []);
+    setMenteeTechStack(response.menteeProfile?.techStack || []);
+    setHelpTopics(response.menteeProfile?.helpTopics || []);
     setProfilePicture(response.user.profilePicture || "");
     setProfilePicturePreview("");
     setProfilePictureUpload("");
@@ -500,6 +522,18 @@ export default function ProfilePage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+    }
+
+    if (section === "mentee") {
+      setForm((prev) => ({
+        ...prev,
+        menteeAbout: menteeProfile?.about || "",
+        menteeGoals: menteeProfile?.goals || "",
+        menteeExperienceLevel: menteeProfile?.experienceLevel || "",
+      }));
+      setMenteeSkills(menteeProfile?.skills || []);
+      setMenteeTechStack(menteeProfile?.techStack || []);
+      setHelpTopics(menteeProfile?.helpTopics || []);
     }
 
     if (section === "mentor") {
@@ -626,6 +660,23 @@ export default function ProfilePage() {
     );
   };
 
+  const saveMenteeSection = () => {
+    saveSection(
+      "mentee",
+      {
+        menteeProfile: {
+          about: form.menteeAbout,
+          skills: menteeSkills,
+          techStack: menteeTechStack,
+          helpTopics,
+          goals: form.menteeGoals,
+          experienceLevel: form.menteeExperienceLevel,
+        },
+      },
+      "פרטי המנטית נשמרו בהצלחה"
+    );
+  };
+
   const saveMentorSection = () => {
     if (!isMentor) {
       return;
@@ -652,6 +703,12 @@ export default function ProfilePage() {
 
   const toggleTopic = (topic: string) => {
     setTopics((prev) =>
+      prev.includes(topic) ? prev.filter((currentTopic) => currentTopic !== topic) : [...prev, topic]
+    );
+  };
+
+  const toggleHelpTopic = (topic: string) => {
+    setHelpTopics((prev) =>
       prev.includes(topic) ? prev.filter((currentTopic) => currentTopic !== topic) : [...prev, topic]
     );
   };
@@ -1043,6 +1100,110 @@ export default function ProfilePage() {
               </Box>
             </>
           )}
+
+          <Divider />
+
+          <Box component="section">
+            <Stack spacing={2.5}>
+              <SectionHeader
+                title="פרטי מנטית"
+                editing={editingSection === "mentee"}
+                saving={savingSection === "mentee"}
+                editDisabled={Boolean(editingSection)}
+                onEdit={() => beginEdit("mentee")}
+                onCancel={() => cancelEdit("mentee")}
+                onSave={saveMenteeSection}
+              />
+
+              {sectionErrors.mentee && <Alert severity="error">{sectionErrors.mentee}</Alert>}
+              {sectionSuccess.mentee && <Alert severity="success">{sectionSuccess.mentee}</Alert>}
+
+              {editingSection === "mentee" ? (
+                <Stack spacing={2.5}>
+                  <TextField
+                    label="כמה מילים עליי"
+                    value={form.menteeAbout}
+                    onChange={(event) => setFormValue("menteeAbout", event.target.value)}
+                    multiline
+                    minRows={3}
+                    fullWidth
+                  />
+
+                  <Stack direction={{ xs: "column", md: "row" }} spacing={2}>
+                    <TextField
+                      label="רמת ניסיון"
+                      value={form.menteeExperienceLevel}
+                      onChange={(event) => setFormValue("menteeExperienceLevel", event.target.value)}
+                      placeholder="מתחילה, שנה ניסיון, אחרי קורס..."
+                      fullWidth
+                    />
+                    <TextField
+                      label="מטרות ללמידה"
+                      value={form.menteeGoals}
+                      onChange={(event) => setFormValue("menteeGoals", event.target.value)}
+                      placeholder="מה תרצי לחזק בפגישות"
+                      fullWidth
+                    />
+                  </Stack>
+
+                  <StringListEditor
+                    label="Skills בתור מנטית"
+                    value={menteeSkills}
+                    onChange={setMenteeSkills}
+                    placeholder="JavaScript, Python..."
+                  />
+
+                  <StringListEditor
+                    label="טכנולוגיות שאני מכירה"
+                    value={menteeTechStack}
+                    onChange={setMenteeTechStack}
+                    placeholder="React, Node.js..."
+                  />
+
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 1.5, color: "primary.dark", fontWeight: 800 }}>
+                      תחומים שבהם אני רוצה עזרה
+                    </Typography>
+                    <TopicSelector
+                      options={MENTOR_TOPIC_OPTIONS}
+                      selectedTopics={helpTopics}
+                      onToggle={toggleHelpTopic}
+                    />
+                  </Box>
+                </Stack>
+              ) : (
+                <Stack spacing={2}>
+                  <DetailGrid>
+                    <DetailItem label="רמת ניסיון" value={form.menteeExperienceLevel} />
+                    <DetailItem label="מטרות ללמידה" value={form.menteeGoals} />
+                  </DetailGrid>
+
+                  <DetailItem label="כמה מילים עליי" value={form.menteeAbout} />
+
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
+                      Skills בתור מנטית
+                    </Typography>
+                    <ChipList items={menteeSkills} />
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
+                      טכנולוגיות שאני מכירה
+                    </Typography>
+                    <ChipList items={menteeTechStack} />
+                  </Box>
+
+                  <Box>
+                    <Typography variant="subtitle2" sx={{ mb: 0.75, color: "primary.dark", fontWeight: 800 }}>
+                      תחומים שבהם אני רוצה עזרה
+                    </Typography>
+                    <ChipList items={helpTopics} />
+                  </Box>
+                </Stack>
+              )}
+            </Stack>
+          </Box>
           </Stack>
         </SurfaceCard>
       </Box>
