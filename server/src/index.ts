@@ -9,6 +9,7 @@ import authRoutes from "./routes/auth";
 import meetingsRoutes from "./routes/meetings";
 import mentorsRoutes from "./routes/mentors";
 import notificationsRoutes from "./routes/notifications";
+import usersRoutes from "./routes/users";
 
 dotenv.config();
 
@@ -26,6 +27,7 @@ app.use("/api/mentors", mentorsRoutes);
 app.use("/api/meetings", meetingsRoutes);
 app.use("/api/notifications", notificationsRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/users", usersRoutes);
 
 app.get("/api/health", (_req, res) => {
   res.json({

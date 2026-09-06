@@ -1,11 +1,13 @@
 import { Schema, model, type Types } from "mongoose";
 
+export type UserRole = "user" | "admin";
+
 export type UserDocument = {
   _id: Types.ObjectId;
   email: string;
   passwordHash: string;
   username: string;
-  role: "user" | "admin";
+  role: UserRole;
   programmingLanguages: string[];
   techStack: string[];
   jobTitle?: string;
@@ -38,7 +40,7 @@ const userSchema = new Schema<UserDocument>(
     },
     role: {
       type: String,
-      enum: ["user", "admin"],
+      enum: ["user", "admin"] satisfies UserRole[],
       default: "user",
     },
     programmingLanguages: {
