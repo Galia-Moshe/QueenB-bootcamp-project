@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { Meeting } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
+import { Notification } from "../models/Notification";
 import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 
@@ -28,6 +29,11 @@ function populateMeeting(query: ReturnType<typeof Meeting.find>) {
     .populate("menteeId", "-passwordHash")
     .populate("availabilityWindowId")
     .sort({ updatedAt: -1 });
+}
+
+function formatWindowDate(dateKey: string) {
+  const [year, month, day] = dateKey.split("-");
+  return `${day}/${month}/${year}`;
 }
 
 router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
@@ -96,6 +102,8 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
       return res.status(409).json({ error: "המועד שבחרת כבר נתפס. אנא בחרי מועד אחר." });
     }
 
+    let populatedMeeting;
+
     try {
       const meeting = await Meeting.create({
         mentorId: claimedWindow.mentorId,
@@ -104,12 +112,10 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
         availabilityWindowId: claimedWindow._id,
       });
 
-      const populatedMeeting = await Meeting.findById(meeting._id)
+      populatedMeeting = await Meeting.findById(meeting._id)
         .populate("mentorId", "-passwordHash")
         .populate("menteeId", "-passwordHash")
         .populate("availabilityWindowId");
-
-      return res.status(201).json({ meeting: populatedMeeting });
     } catch (creationError) {
       await AvailabilityWindow.findOneAndUpdate(
         { _id: availabilityWindowId, status: "pending" },
@@ -117,6 +123,16 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
       );
       throw creationError;
     }
+
+    // Booking succeeded: notify the mentor. Kept outside the block above so a
+    // notification failure never triggers the availability-window rollback.
+    await Notification.create({
+      recipient: claimedWindow.mentorId,
+      type: "new_meeting_request",
+      message: `קיבלת בקשה חדשה לפגישה בתאריך ${formatWindowDate(claimedWindow.date)} בשעה ${claimedWindow.startTime}–${claimedWindow.endTime}`,
+    });
+
+    return res.status(201).json({ meeting: populatedMeeting });
   } catch (error) {
     next(error);
   }

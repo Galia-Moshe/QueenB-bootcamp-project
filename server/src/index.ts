@@ -8,6 +8,7 @@ import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
 import meetingsRoutes from "./routes/meetings";
 import mentorsRoutes from "./routes/mentors";
+import notificationsRoutes from "./routes/notifications";
 
 dotenv.config();
 
@@ -23,6 +24,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/api/auth", authRoutes);
 app.use("/api/mentors", mentorsRoutes);
 app.use("/api/meetings", meetingsRoutes);
+app.use("/api/notifications", notificationsRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.get("/api/health", (_req, res) => {
