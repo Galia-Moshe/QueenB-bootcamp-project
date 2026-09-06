@@ -1,10 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import type { EventClickArg } from "@fullcalendar/core";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import heLocale from "@fullcalendar/core/locales/he";
 import {
   Alert,
   Box,
@@ -22,11 +18,13 @@ import {
 import { api, getApiErrorMessage } from "../../api";
 import type { Meeting, MeetingStatus, User } from "../../types";
 import { meetingStatusOptions, statusColors, statusLabels } from "../../types";
-import { MeetingDetailsModal } from "./MeetingDetailsModal";
-
-function meetingEventStart(meeting: Meeting): string | undefined {
-  return meeting.selectedTime || meeting.proposedTimes[0] || meeting.createdAt;
-}
+import { MeetingDetailsModal } from "../meetings/MeetingDetailsModal";
+import {
+  formatMeetingToEvent,
+  meetingEventStart,
+  sharedCalendarContainerSx,
+  sharedCalendarProps,
+} from "../../utils/calendarUtils";
 
 function formatDateTime(value?: string) {
   if (!value) {
@@ -174,21 +172,7 @@ export function AdminSystemCalendar() {
   const calendarEvents = useMemo(
     () =>
       meetings
-        .map((meeting) => {
-          const start = meetingEventStart(meeting);
-          if (!start) {
-            return null;
-          }
-
-          return {
-            id: meeting._id,
-            title: `${meeting.mentorId.username} & ${meeting.menteeId.username}`,
-            start,
-            backgroundColor: statusColors[meeting.status],
-            borderColor: statusColors[meeting.status],
-            textColor: "#ffffff",
-          };
-        })
+        .map((meeting) => formatMeetingToEvent(meeting))
         .filter((event): event is NonNullable<typeof event> => event !== null),
     [meetings]
   );
@@ -263,31 +247,11 @@ export function AdminSystemCalendar() {
             sx={{
               p: 2,
               borderRadius: 2,
-              overflow: "hidden",
-              "& .fc-event, & .fc-timegrid-slot": {
-                cursor: "pointer",
-              },
+              ...sharedCalendarContainerSx,
             }}
           >
             <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              headerToolbar={{
-                start: "prev,next today",
-                center: "title",
-                end: "dayGridMonth,timeGridWeek,timeGridDay",
-              }}
-              buttonText={{
-                today: "היום",
-                month: "חודש",
-                week: "שבוע",
-                day: "יום",
-              }}
-              locale={heLocale}
-              direction="rtl"
-              height="auto"
-              eventDisplay="block"
-              displayEventTime={false}
+              {...sharedCalendarProps}
               events={calendarEvents}
               eventClick={handleEventClick}
             />
