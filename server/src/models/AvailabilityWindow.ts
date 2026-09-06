@@ -1,12 +1,16 @@
 import { Schema, model, type Types } from "mongoose";
 
+export const availabilityWindowStatuses = ["available", "pending", "booked"] as const;
+
+export type AvailabilityWindowStatus = (typeof availabilityWindowStatuses)[number];
+
 export type AvailabilityWindowDocument = {
   _id: Types.ObjectId;
   mentorId: Types.ObjectId;
   date: string;
   startTime: string;
   endTime: string;
-  meetingLength: number;
+  status: AvailabilityWindowStatus;
 };
 
 const availabilityWindowSchema = new Schema<AvailabilityWindowDocument>(
@@ -31,10 +35,11 @@ const availabilityWindowSchema = new Schema<AvailabilityWindowDocument>(
       required: true,
       match: /^([01]\d|2[0-3]):[0-5]\d$/,
     },
-    meetingLength: {
-      type: Number,
+    status: {
+      type: String,
+      enum: availabilityWindowStatuses,
+      default: "available",
       required: true,
-      min: 5,
     },
   },
   {

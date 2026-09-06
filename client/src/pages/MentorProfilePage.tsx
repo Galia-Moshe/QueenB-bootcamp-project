@@ -17,48 +17,11 @@ import type { AppLayoutContext } from "../components/AppLayout";
 import TopicSelector from "../components/mentor-profile/TopicSelector";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
+import { HELP_AREAS } from "../constants/topics";
 import MentorAvailabilityStep from "./MentorAvailabilityStep";
 import type { MentorProfile } from "../types";
 
 type WizardStep = "details" | "availability";
-
-const HELP_AREAS = [
-  "DevOps",
-  "Data",
-  "Cloud / Infrastructure",
-  "Backend Engineer",
-  "AI / Machine Learning",
-  "Product",
-  "Mobile (iOS / Android)",
-  "Full Stack",
-  "Front End",
-  "Embedded / Hardware",
-  "Business Development (BizDev)",
-  "Technical Writing",
-  "Security / Cyber",
-  "R&D / Research",
-  "Partnerships",
-  "Marketing",
-  "Growth / Acquisition",
-  "Business Operations (BizOps)",
-  "Solutions Engineering / Pre-Sales",
-  "Sales",
-  "Revenue Operations (RevOps)",
-  "Operations",
-  "IT",
-  "Design (UX/UI)",
-  "BI / Business Intelligence",
-  "Agile / Scrum Master",
-  "Customer Care",
-  "Community Management",
-  "Technical Project Manager",
-  "QA",
-  "Finance",
-  "HR",
-  "Technical Support",
-  "Customer Success",
-  "אחר",
-];
 
 export default function MentorProfilePage() {
   const { refreshMentorProfile } = useOutletContext<AppLayoutContext>();
@@ -231,7 +194,7 @@ export default function MentorProfilePage() {
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                   בחרי תחום אחד או יותר
                 </Typography>
-                <TopicSelector options={HELP_AREAS} selectedTopics={topics} onToggle={toggleTopic} />
+                <TopicSelector options={[...HELP_AREAS]} selectedTopics={topics} onToggle={toggleTopic} />
               </Box>
 
               <Button type="submit" variant="contained" dir="ltr">

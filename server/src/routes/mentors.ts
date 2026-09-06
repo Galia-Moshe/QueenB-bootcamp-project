@@ -1,6 +1,9 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { MentorProfile } from "../models/MentorProfile";
+import { listMentors } from "../controllers/mentorsController";
+import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
 import { normalizeStringList, sanitizeUser } from "../utils/users";
 
@@ -19,17 +22,7 @@ function toMinutes(time: string) {
   return hours * 60 + minutes;
 }
 
-router.get("/", requireAuth, async (_req, res, next) => {
-  try {
-    const mentorProfiles = await MentorProfile.find()
-      .populate("userId", "-passwordHash")
-      .sort({ updatedAt: -1 });
-
-    return res.json({ mentors: mentorProfiles });
-  } catch (error) {
-    next(error);
-  }
-});
+router.get("/", requireAuth, listMentors);
 
 router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
@@ -87,23 +80,14 @@ router.get("/me/availability", requireAuth, async (req: AuthRequest, res, next) 
 
 router.post("/me/availability", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { date, startTime, endTime, meetingLength } = req.body;
+    const { date, startTime, endTime } = req.body;
 
     if (!isValidDate(date) || !isValidTime(startTime) || !isValidTime(endTime)) {
       return res.status(400).json({ error: "יש להזין תאריך ושעות תקינים" });
     }
 
-    const length = Number(meetingLength);
-    if (!length || length <= 0) {
-      return res.status(400).json({ error: "יש לבחור אורך פגישה תקין" });
-    }
-
     if (toMinutes(endTime) <= toMinutes(startTime)) {
       return res.status(400).json({ error: "שעת הסיום חייבת להיות אחרי שעת ההתחלה" });
-    }
-
-    if (toMinutes(endTime) - toMinutes(startTime) < length) {
-      return res.status(400).json({ error: "טווח הזמן קצר מאורך הפגישה שנבחר" });
     }
 
     const availabilityWindow = await AvailabilityWindow.create({
@@ -111,7 +95,7 @@ router.post("/me/availability", requireAuth, async (req: AuthRequest, res, next)
       date,
       startTime,
       endTime,
-      meetingLength: length,
+      status: "available",
     });
 
     return res.status(201).json({ availabilityWindow });
@@ -122,23 +106,14 @@ router.post("/me/availability", requireAuth, async (req: AuthRequest, res, next)
 
 router.put("/me/availability/:id", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { date, startTime, endTime, meetingLength } = req.body;
+    const { date, startTime, endTime } = req.body;
 
     if (!isValidDate(date) || !isValidTime(startTime) || !isValidTime(endTime)) {
       return res.status(400).json({ error: "יש להזין תאריך ושעות תקינים" });
     }
 
-    const length = Number(meetingLength);
-    if (!length || length <= 0) {
-      return res.status(400).json({ error: "יש לבחור אורך פגישה תקין" });
-    }
-
     if (toMinutes(endTime) <= toMinutes(startTime)) {
       return res.status(400).json({ error: "שעת הסיום חייבת להיות אחרי שעת ההתחלה" });
-    }
-
-    if (toMinutes(endTime) - toMinutes(startTime) < length) {
-      return res.status(400).json({ error: "טווח הזמן קצר מאורך הפגישה שנבחר" });
     }
 
     const availabilityWindow = await AvailabilityWindow.findOne({
@@ -150,10 +125,13 @@ router.put("/me/availability/:id", requireAuth, async (req: AuthRequest, res, ne
       return res.status(404).json({ error: "חלון הזמינות לא נמצא" });
     }
 
+    if (availabilityWindow.status !== "available") {
+      return res.status(409).json({ error: "אי אפשר לערוך חלון זמינות שיש בו בקשה ממתינה או פגישה שנקבעה" });
+    }
+
     availabilityWindow.date = date;
     availabilityWindow.startTime = startTime;
     availabilityWindow.endTime = endTime;
-    availabilityWindow.meetingLength = length;
     await availabilityWindow.save();
 
     return res.json({ availabilityWindow });
@@ -164,7 +142,7 @@ router.put("/me/availability/:id", requireAuth, async (req: AuthRequest, res, ne
 
 router.delete("/me/availability/:id", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const availabilityWindow = await AvailabilityWindow.findOneAndDelete({
+    const availabilityWindow = await AvailabilityWindow.findOne({
       _id: req.params.id,
       mentorId: req.user!._id,
     });
@@ -173,7 +151,44 @@ router.delete("/me/availability/:id", requireAuth, async (req: AuthRequest, res,
       return res.status(404).json({ error: "חלון הזמינות לא נמצא" });
     }
 
+    if (availabilityWindow.status !== "available") {
+      return res.status(409).json({ error: "אי אפשר למחוק חלון זמינות שיש בו בקשה ממתינה או פגישה שנקבעה" });
+    }
+
+    await availabilityWindow.deleteOne();
+
     return res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:mentorId/availability", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const { mentorId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(mentorId)) {
+      return res.status(400).json({ error: "מזהה מנטורית לא תקין" });
+    }
+
+    const mentorUser = await User.findById(mentorId);
+    if (!mentorUser) {
+      return res.status(404).json({ error: "המנטורית לא נמצאה" });
+    }
+
+    const mentorProfile = await MentorProfile.findOne({ userId: mentorId });
+    if (!mentorProfile) {
+      return res.status(404).json({ error: "המנטורית לא נמצאה" });
+    }
+
+    const availabilityWindows = await AvailabilityWindow.find({
+      mentorId,
+      status: "available",
+    })
+      .select("mentorId date startTime endTime status")
+      .sort({ date: 1, startTime: 1 });
+
+    return res.json({ availabilityWindows });
   } catch (error) {
     next(error);
   }

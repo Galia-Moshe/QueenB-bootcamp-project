@@ -33,8 +33,6 @@ const TIME_OPTIONS = Array.from({ length: 36 }, (_, index) => {
   return `${hours}:${minutes}`;
 });
 
-const DURATION_OPTIONS = [15, 20, 30, 45, 60, 90];
-
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -68,7 +66,6 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
   const [editingId, setEditingId] = useState<string | null>(null);
   const [startTime, setStartTime] = useState("10:00");
   const [endTime, setEndTime] = useState("12:00");
-  const [meetingLength, setMeetingLength] = useState<number>(20);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +128,6 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
     setEditingId(null);
     setStartTime("10:00");
     setEndTime("12:00");
-    setMeetingLength(20);
     setFormError("");
     setFormOpen(true);
   };
@@ -140,7 +136,6 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
     setEditingId(window._id);
     setStartTime(window.startTime);
     setEndTime(window.endTime);
-    setMeetingLength(window.meetingLength);
     setFormError("");
     setFormOpen(true);
   };
@@ -152,7 +147,7 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
     setFormError("");
 
     try {
-      const payload = { date: selectedDate, startTime, endTime, meetingLength };
+      const payload = { date: selectedDate, startTime, endTime };
 
       if (editingId) {
         const response = await api.put<{ availabilityWindow: AvailabilityWindow }>(
@@ -285,7 +280,7 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
                     }}
                   >
                     <Typography variant="body2">
-                      {window.startTime}–{window.endTime} · {window.meetingLength} דקות
+                      {window.startTime}–{window.endTime}
                     </Typography>
                     <Stack direction="row" spacing={0.5}>
                       <IconButton size="small" onClick={() => openEditForm(window)}>
@@ -326,20 +321,6 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
                   {TIME_OPTIONS.map((time) => (
                     <MenuItem key={time} value={time}>
                       {time}
-                    </MenuItem>
-                  ))}
-                </TextField>
-
-                <TextField
-                  select
-                  label="אורך פגישה"
-                  value={meetingLength}
-                  onChange={(event) => setMeetingLength(Number(event.target.value))}
-                  fullWidth
-                >
-                  {DURATION_OPTIONS.map((duration) => (
-                    <MenuItem key={duration} value={duration}>
-                      {duration} דקות
                     </MenuItem>
                   ))}
                 </TextField>
