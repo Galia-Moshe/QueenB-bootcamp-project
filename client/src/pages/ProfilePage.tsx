@@ -31,6 +31,7 @@ import TopicSelector from "../components/mentor-profile/TopicSelector";
 import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
+import { UserProfileLink } from "../components/UserProfileLink";
 import { MENTOR_TOPIC_OPTIONS } from "../constants/mentorTopics";
 import type { Meeting, MenteeProfile, MentorProfile, User } from "../types";
 import { statusLabels } from "../types";
@@ -106,8 +107,8 @@ function formatDateTime(value: string) {
   }).format(new Date(value));
 }
 
-function otherParticipantName(meeting: Meeting, role: MeetingRole) {
-  return role === "mentor" ? meeting.menteeId.username : meeting.mentorId.username;
+function otherParticipant(meeting: Meeting, role: MeetingRole): User {
+  return role === "mentor" ? meeting.menteeId : meeting.mentorId;
 }
 
 function buildForm(
@@ -242,6 +243,7 @@ function MeetingCancellationCard({
   const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const participant = otherParticipant(meeting, role);
   const meetingTime = meeting.selectedTime
     ? `מועד הפגישה: ${formatDateTime(meeting.selectedTime)}`
     : "מועד הפגישה עדיין לא נקבע";
@@ -268,7 +270,7 @@ function MeetingCancellationCard({
           <Stack direction="column" spacing={1} alignItems="stretch">
             <Box sx={{ width: "100%", textAlign: "start" }}>
               <Typography sx={{ color: "primary.dark", fontWeight: 800, textAlign: "start" }}>
-                {otherParticipantName(meeting, role)}
+                <UserProfileLink userId={participant._id} userName={participant.username} />
               </Typography>
               <Typography variant="body2" color="text.secondary" sx={{ textAlign: "start" }}>
                 {meetingTime}
