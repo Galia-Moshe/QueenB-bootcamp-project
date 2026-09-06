@@ -17,6 +17,7 @@ import PersonAddAlt1Icon from "@mui/icons-material/PersonAddAlt1";
 import SchoolIcon from "@mui/icons-material/School";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api";
+import NotificationBell from "./notifications/NotificationBell";
 import type { MentorProfile } from "../types";
 
 export type AppLayoutContext = {
@@ -115,6 +116,8 @@ export function AppLayout() {
           </Stack>
 
           <Stack direction="row" spacing={1} alignItems="center" useFlexGap sx={{ flexWrap: "wrap" }}>
+            <NotificationBell />
+
             <Button
               component={RouterLink}
               to="/profile"
@@ -124,6 +127,7 @@ export function AppLayout() {
             >
               {user?.username ? `${user.username} - אזור אישי` : "אזור אישי"}
             </Button>
+
             <Button
               color="inherit"
               startIcon={<LogoutIcon />}
