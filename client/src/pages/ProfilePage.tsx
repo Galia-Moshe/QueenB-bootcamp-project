@@ -1,4 +1,4 @@
-import React, { ChangeEvent, ReactNode, useEffect, useState } from "react";
+import React, { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -6,12 +6,20 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   Link as MuiLink,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -24,7 +32,8 @@ import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import { MENTOR_TOPIC_OPTIONS } from "../constants/mentorTopics";
-import type { MentorProfile, User } from "../types";
+import type { Meeting, MentorProfile, User } from "../types";
+import { statusLabels } from "../types";
 
 type ProfileResponse = {
   user: User;
@@ -45,6 +54,7 @@ type ProfileForm = {
 };
 
 type SectionKey = "picture" | "account" | "password" | "mentor";
+type MeetingRole = "mentee" | "mentor";
 
 type SectionHeaderProps = {
   title: string;
@@ -73,9 +83,24 @@ const EMPTY_FORM: ProfileForm = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROFILE_IMAGE_TYPES = ["image/gif", "image/jpeg", "image/png", "image/webp"];
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+const meetingRoleLabels: Record<MeetingRole, string> = {
+  mentor: "מנטורית",
+  mentee: "מנטית",
+};
 
 function numberToField(value?: number) {
   return value === undefined || value === null ? "" : String(value);
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("he-IL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function otherParticipantName(meeting: Meeting, role: MeetingRole) {
+  return role === "mentor" ? meeting.menteeId.username : meeting.mentorId.username;
 }
 
 function buildForm(user: User, mentorProfile: MentorProfile | null): ProfileForm {
@@ -188,6 +213,209 @@ function ChipList({ items }: { items: string[] }) {
         <Chip key={item} label={item} size="small" />
       ))}
     </Stack>
+  );
+}
+
+function MeetingCancellationCard({
+  meeting,
+  role,
+  onCanceled,
+}: {
+  meeting: Meeting;
+  role: MeetingRole;
+  onCanceled: () => void;
+}) {
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+  const meetingTime = meeting.selectedTime
+    ? `מועד הפגישה: ${formatDateTime(meeting.selectedTime)}`
+    : "מועד הפגישה עדיין לא נקבע";
+
+  const cancelMeeting = async () => {
+    setError("");
+    setSubmitting(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/decline`);
+      setCancelDialogOpen(false);
+      onCanceled();
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <>
+      <SurfaceCard dir="rtl" variant="outlined" muted shadow={false} sx={{ textAlign: "start" }}>
+        <Stack spacing={1.25} sx={{ alignItems: "stretch" }}>
+          <Stack direction="column" spacing={1} alignItems="stretch">
+            <Box sx={{ width: "100%", textAlign: "start" }}>
+              <Typography sx={{ color: "primary.dark", fontWeight: 800, textAlign: "start" }}>
+                {otherParticipantName(meeting, role)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ textAlign: "start" }}>
+                {meetingTime}
+              </Typography>
+            </Box>
+
+            <Stack
+              direction="row"
+              spacing={1}
+              useFlexGap
+              flexWrap="wrap"
+              sx={{ justifyContent: "flex-start" }}
+            >
+              <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={<CancelOutlinedIcon />}
+                onClick={() => setCancelDialogOpen(true)}
+                disabled={submitting}
+              >
+                ביטול פגישה
+              </Button>
+            </Stack>
+          </Stack>
+
+          {error && <Alert severity="error">{error}</Alert>}
+        </Stack>
+      </SurfaceCard>
+
+      <Dialog
+        open={cancelDialogOpen}
+        onClose={() => !submitting && setCancelDialogOpen(false)}
+        fullWidth
+        maxWidth="xs"
+        PaperProps={{ dir: "rtl", sx: { textAlign: "start" } }}
+      >
+        <DialogTitle sx={{ color: "primary.dark", fontWeight: 900 }}>ביטול פגישה</DialogTitle>
+        <DialogContent>
+          <DialogContentText>האם את בטוחה שברצונך לבטל את הפגישה?</DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button onClick={() => setCancelDialogOpen(false)} disabled={submitting}>
+            חזרה
+          </Button>
+          <Button variant="contained" onClick={cancelMeeting} disabled={submitting}>
+            ביטול פגישה
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
+  );
+}
+
+function MeetingsCancellationPanel({ isMentor }: { isMentor: boolean }) {
+  const [meetingRole, setMeetingRole] = useState<MeetingRole>("mentee");
+  const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const canSwitchRoles = isMentor;
+  const effectiveRole = canSwitchRoles ? meetingRole : "mentee";
+  const activeMeetings = useMemo(
+    () => meetings.filter((meeting) => meeting.status !== "canceled"),
+    [meetings]
+  );
+
+  const loadMeetings = useCallback(async (role: MeetingRole) => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await api.get<{ meetings: Meeting[] }>(`/meetings/my?role=${role}`);
+      setMeetings(response.data.meetings);
+    } catch (err) {
+      setError(getApiErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!canSwitchRoles && meetingRole !== "mentee") {
+      setMeetingRole("mentee");
+      return;
+    }
+
+    loadMeetings(effectiveRole);
+  }, [canSwitchRoles, effectiveRole, loadMeetings, meetingRole]);
+
+  return (
+    <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
+      <Stack spacing={2}>
+        <Box sx={{ textAlign: "start" }}>
+          <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+            {`הפגישות שלי בתור ${meetingRoleLabels[effectiveRole]}`}
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            ביטול פגישות פעילות מהאזור האישי
+          </Typography>
+        </Box>
+
+        {canSwitchRoles && (
+          <ToggleButtonGroup
+            dir="rtl"
+            exclusive
+            size="small"
+            value={meetingRole}
+            onChange={(_event, nextRole: MeetingRole | null) => {
+              if (nextRole) {
+                setMeetingRole(nextRole);
+              }
+            }}
+            sx={{
+              alignSelf: "stretch",
+              "& .MuiToggleButton-root": {
+                flex: 1,
+                minHeight: 36,
+                px: 1.5,
+                borderColor: "#f8bbd0",
+                color: "primary.dark",
+                fontWeight: 800,
+                whiteSpace: "nowrap",
+                "&.Mui-selected": {
+                  bgcolor: "primary.main",
+                  color: "#ffffff",
+                  "&:hover": {
+                    bgcolor: "primary.dark",
+                  },
+                },
+              },
+            }}
+          >
+            <ToggleButton value="mentee">בתור מנטית</ToggleButton>
+            <ToggleButton value="mentor">בתור מנטורית</ToggleButton>
+          </ToggleButtonGroup>
+        )}
+
+        <Divider />
+
+        {error && <Alert severity="error">{error}</Alert>}
+
+        {loading ? (
+          <Box sx={{ display: "grid", placeItems: "center", minHeight: 140 }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : activeMeetings.length === 0 ? (
+          <Typography color="text.secondary">אין פגישות פעילות לביטול כרגע.</Typography>
+        ) : (
+          <Stack spacing={1.5}>
+            {activeMeetings.map((meeting) => (
+              <MeetingCancellationCard
+                key={meeting._id}
+                meeting={meeting}
+                role={effectiveRole}
+                onCanceled={() => loadMeetings(effectiveRole)}
+              />
+            ))}
+          </Stack>
+        )}
+      </Stack>
+    </SurfaceCard>
   );
 }
 
@@ -486,8 +714,30 @@ export default function ProfilePage() {
 
       {loadError && <Alert severity="error">{loadError}</Alert>}
 
-      <SurfaceCard centered sx={{ p: { xs: 2, md: 3 }, maxWidth: 1040 }}>
-        <Stack spacing={3.25}>
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1040px) 360px" },
+          gap: 3,
+          alignItems: "start",
+          justifyContent: "center",
+        }}
+      >
+        <Box sx={{ gridColumn: { xs: "auto", lg: 2 }, gridRow: { xs: "auto", lg: 1 } }}>
+          <MeetingsCancellationPanel isMentor={isMentor} />
+        </Box>
+
+        <SurfaceCard
+          dir="rtl"
+          centered
+          sx={{
+            p: { xs: 2, md: 3 },
+            maxWidth: 1040,
+            gridColumn: { xs: "auto", lg: 1 },
+            gridRow: { xs: "auto", lg: 1 },
+          }}
+        >
+          <Stack spacing={3.25}>
           <Box component="section">
             <Stack spacing={2}>
               <SectionHeader
@@ -793,8 +1043,9 @@ export default function ProfilePage() {
               </Box>
             </>
           )}
-        </Stack>
-      </SurfaceCard>
+          </Stack>
+        </SurfaceCard>
+      </Box>
     </Stack>
   );
 }
