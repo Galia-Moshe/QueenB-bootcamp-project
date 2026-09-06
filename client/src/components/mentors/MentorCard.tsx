@@ -20,8 +20,15 @@ export default function MentorCard({
   onRequestMeeting,
 }: MentorCardProps) {
   return (
-    <SurfaceCard sx={{ p: 2.5, height: "100%" }}>
-      <Stack spacing={2}>
+    <SurfaceCard
+      sx={{
+        p: 2.5,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <Box sx={{ flexGrow: 1, display: "flex", flexDirection: "column", gap: 2 }}>
         <Stack direction="row" spacing={2} alignItems="center">
           <Avatar
             src={mentor?.profilePicture}
@@ -55,16 +62,17 @@ export default function MentorCard({
           {profile.meetingLength && <Chip label={`${profile.meetingLength} דקות`} size="small" />}
           {profile.maxMeetings && <Chip label={`עד ${profile.maxMeetings} פגישות`} size="small" />}
         </Stack>
+      </Box>
 
-        <Button
-          variant="contained"
-          startIcon={<CalendarMonthIcon />}
-          disabled={!mentor || isCurrentUser || requesting}
-          onClick={() => mentor && onRequestMeeting(mentor)}
-        >
-          {isCurrentUser ? "זו את" : "בקשת פגישה"}
-        </Button>
-      </Stack>
+      <Button
+        variant="contained"
+        startIcon={<CalendarMonthIcon />}
+        disabled={!mentor || isCurrentUser || requesting}
+        onClick={() => mentor && onRequestMeeting(mentor)}
+        sx={{ mt: 2, alignSelf: "stretch" }}
+      >
+        {isCurrentUser ? "זו את" : "בקשת פגישה"}
+      </Button>
     </SurfaceCard>
   );
 }
