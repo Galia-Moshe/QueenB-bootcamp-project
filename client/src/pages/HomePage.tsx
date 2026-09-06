@@ -1,9 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import interactionPlugin from "@fullcalendar/interaction";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import heLocale from "@fullcalendar/core/locales/he";
+import type { EventClickArg } from "@fullcalendar/core";
 import {
   Alert,
   Box,
@@ -20,10 +17,16 @@ import {
 import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../api";
+import { MeetingDetailsModal } from "../components/meetings/MeetingDetailsModal";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import type { Meeting, MentorProfile } from "../types";
 import { statusLabels } from "../types";
+import {
+  formatMeetingToEvent,
+  sharedCalendarContainerSx,
+  sharedCalendarProps,
+} from "../utils/calendarUtils";
 
 type MeetingRole = "mentee" | "mentor";
 
@@ -163,6 +166,7 @@ export default function HomePage() {
   const [role, setRole] = useState<MeetingRole>("mentee");
   const [mentorProfile, setMentorProfile] = useState<MentorProfile | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
+  const [selectedMeeting, setSelectedMeeting] = useState<Meeting | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -189,17 +193,26 @@ export default function HomePage() {
     loadMeetings(role);
   }, [role, loadMeetings]);
 
+  const handleEventClick = useCallback(
+    (clickInfo: EventClickArg) => {
+      const meeting = meetings.find((item) => item._id === clickInfo.event.id);
+      if (meeting) {
+        setSelectedMeeting(meeting);
+      }
+    },
+    [meetings]
+  );
+
+  const closeMeetingDetails = useCallback(() => {
+    setSelectedMeeting(null);
+  }, []);
+
   const scheduledEvents = useMemo(
     () =>
       meetings
         .filter((meeting) => Boolean(meeting.selectedTime))
-        .map((meeting) => ({
-          id: meeting._id,
-          title: `${otherParticipantName(meeting, role)} - ${statusLabels[meeting.status]}`,
-          start: meeting.selectedTime,
-          backgroundColor: meeting.status === "scheduled" ? "#d81b60" : "#ad1457",
-          borderColor: "transparent",
-        })),
+        .map((meeting) => formatMeetingToEvent(meeting, role))
+        .filter((event): event is NonNullable<typeof event> => event !== null),
     [meetings, role]
   );
 
@@ -241,25 +254,11 @@ export default function HomePage() {
         </Box>
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "2fr 1fr" }, gap: 3 }}>
-          <SurfaceCard sx={{ overflow: "hidden" }}>
+          <SurfaceCard sx={sharedCalendarContainerSx}>
             <FullCalendar
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="dayGridMonth"
-              headerToolbar={{
-                start: "prev,next today",
-                center: "title",
-                end: "dayGridMonth,timeGridWeek,timeGridDay",
-              }}
-              buttonText={{
-                today: "היום",
-                month: "חודש",
-                week: "שבוע",
-                day: "יום",
-              }}
-              locale={heLocale}
-              direction="rtl"
-              height="auto"
+              {...sharedCalendarProps}
               events={scheduledEvents}
+              eventClick={handleEventClick}
             />
           </SurfaceCard>
 
@@ -292,6 +291,12 @@ export default function HomePage() {
           </SurfaceCard>
         </Box>
       )}
+
+      <MeetingDetailsModal
+        meeting={selectedMeeting}
+        open={Boolean(selectedMeeting)}
+        onClose={closeMeetingDetails}
+      />
     </Stack>
   );
 }
