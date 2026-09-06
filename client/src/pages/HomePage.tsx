@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import FullCalendar from "@fullcalendar/react";
+import type { EventClickArg } from "@fullcalendar/core";
 import type { DateClickArg } from "@fullcalendar/interaction";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -391,6 +392,7 @@ export default function HomePage() {
               title: `${availabilityWindow.startTime}–${availabilityWindow.endTime} פגישה עם ${participantName}`,
               start: `${availabilityWindow.date}T${availabilityWindow.startTime}:00`,
               end: `${availabilityWindow.date}T${availabilityWindow.endTime}:00`,
+              allDay: false,
               backgroundColor: "#d81b60",
               borderColor: "transparent",
             };
@@ -457,7 +459,25 @@ export default function HomePage() {
         </Box>
       ) : (
         <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", lg: "2fr 1fr" }, gap: 3 }}>
-          <SurfaceCard sx={{ overflow: "hidden" }}>
+          <SurfaceCard
+            sx={{
+              overflow: "hidden",
+              "& .fc-daygrid-day-frame": {
+                cursor: "pointer",
+                transition: "background-color 0.15s ease",
+              },
+              "& .fc-daygrid-day-frame:hover": {
+                backgroundColor: "rgba(236, 64, 122, 0.08)",
+              },
+              "& .fc-event": {
+                cursor: "pointer",
+              },
+              "& .fc-day-selected .fc-daygrid-day-frame": {
+                backgroundColor: "rgba(216, 27, 96, 0.16)",
+                boxShadow: "inset 0 0 0 2px #d81b60",
+              },
+            }}
+          >
             <FullCalendar
               plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
               initialView="dayGridMonth"
@@ -478,6 +498,12 @@ export default function HomePage() {
               events={scheduledEvents}
               displayEventTime={false}
               dateClick={(arg: DateClickArg) => setSelectedDate(toDateKey(arg.date))}
+              eventClick={(arg: EventClickArg) => {
+                if (arg.event.start) {
+                  setSelectedDate(toDateKey(arg.event.start));
+                }
+              }}
+              dayCellClassNames={(arg) => (toDateKey(arg.date) === selectedDate ? ["fc-day-selected"] : [])}
             />
           </SurfaceCard>
 

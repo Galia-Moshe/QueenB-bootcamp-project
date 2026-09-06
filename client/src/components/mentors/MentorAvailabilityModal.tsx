@@ -22,7 +22,13 @@ import CloseIcon from "@mui/icons-material/Close";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../../api";
 import SurfaceCard from "../ui/SurfaceCard";
-import type { AvailabilityWindow, User } from "../../types";
+import type { AvailabilityWindow, Meeting, User } from "../../types";
+
+function toDateKey(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
 
 function formatDayLabel(dateKey: string) {
   const date = new Date(`${dateKey}T00:00:00`);
@@ -48,6 +54,7 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [hasScheduledMeetingWithMentor, setHasScheduledMeetingWithMentor] = useState(false);
 
   const fetchAvailability = useCallback(async () => {
     if (!mentor) return;
@@ -57,6 +64,16 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
     );
     setWindows(response.data.availabilityWindows);
     return response.data.availabilityWindows;
+  }, [mentor]);
+
+  const checkExistingScheduledMeeting = useCallback(async () => {
+    if (!mentor) return;
+
+    const response = await api.get<{ meetings: Meeting[] }>("/meetings/my?role=mentee");
+    const alreadyScheduled = response.data.meetings.some(
+      (meeting) => meeting.status === "scheduled" && meeting.mentorId._id === mentor._id
+    );
+    setHasScheduledMeetingWithMentor(alreadyScheduled);
   }, [mentor]);
 
   useEffect(() => {
@@ -69,11 +86,12 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
     setSubmitError("");
     setSelectedDate(null);
     setSelectedWindowId(null);
+    setHasScheduledMeetingWithMentor(false);
 
-    fetchAvailability()
+    Promise.all([fetchAvailability(), checkExistingScheduledMeeting()])
       .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [open, mentor, fetchAvailability]);
+  }, [open, mentor, fetchAvailability, checkExistingScheduledMeeting]);
 
   const windowsByDate = useMemo(() => {
     const map = new Map<string, AvailabilityWindow[]>();
@@ -180,6 +198,10 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
             </Box>
           ) : loadError ? (
             <Alert severity="error">{loadError}</Alert>
+          ) : hasScheduledMeetingWithMentor ? (
+            <Alert severity="info">
+              כבר יש לך פגישה מתוזמנת עם המנטורית הזו. אפשר לקבוע פגישה נוספת לאחר שהפגישה הקיימת תסתיים או תבוטל.
+            </Alert>
           ) : windows.length === 0 ? (
             <Alert severity="info">אין כרגע מועדים זמינים אצל המנטורית הזו.</Alert>
           ) : (
@@ -203,6 +225,10 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
                   "& .fc-day-unavailable .fc-daygrid-day-frame:hover": {
                     backgroundColor: "transparent",
                   },
+                  "& .fc-day-selected .fc-daygrid-day-frame": {
+                    backgroundColor: "rgba(216, 27, 96, 0.16)",
+                    boxShadow: "inset 0 0 0 2px #d81b60",
+                  },
                 }}
               >
                 <FullCalendar
@@ -215,15 +241,20 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
                   direction="rtl"
                   height="auto"
                   events={calendarEvents}
-                  dayCellClassNames={(arg) =>
-                    windowsByDate.has(
-                      `${arg.date.getFullYear()}-${String(arg.date.getMonth() + 1).padStart(2, "0")}-${String(
-                        arg.date.getDate()
-                      ).padStart(2, "0")}`
-                    )
-                      ? []
-                      : ["fc-day-unavailable"]
-                  }
+                  dayCellClassNames={(arg) => {
+                    const dateKey = toDateKey(arg.date);
+                    const classNames: string[] = [];
+
+                    if (!windowsByDate.has(dateKey)) {
+                      classNames.push("fc-day-unavailable");
+                    }
+
+                    if (dateKey === selectedDate) {
+                      classNames.push("fc-day-selected");
+                    }
+
+                    return classNames;
+                  }}
                   dateClick={(arg: DateClickArg) => openDay(arg.dateStr)}
                   eventClick={(arg: EventClickArg) => openDay(arg.event.startStr)}
                 />

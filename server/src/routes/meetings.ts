@@ -91,6 +91,16 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
     }
 
+    const existingScheduledMeeting = await Meeting.findOne({
+      mentorId: availabilityWindow.mentorId,
+      menteeId: req.user!._id,
+      status: "scheduled",
+    });
+
+    if (existingScheduledMeeting) {
+      return res.status(409).json({ error: "כבר יש לך פגישה מתוזמנת עם המנטורית הזו" });
+    }
+
     // Atomically claim the slot: only the request that flips available -> pending may proceed.
     const claimedWindow = await AvailabilityWindow.findOneAndUpdate(
       { _id: availabilityWindowId, status: "available" },
@@ -418,12 +428,16 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
       return res.status(409).json({ error: "הפגישה כבר טופלה" });
     }
 
-    // Atomically release the slot: only the cancellation that finds it still "booked" may proceed.
-    const releasedWindow = await AvailabilityWindow.findOneAndUpdate(
-      { _id: availabilityWindow._id, status: "booked" },
-      { $set: { status: "available" } },
-      { new: true }
-    );
+    // Atomically claim the cancellation: only the request that finds the slot still "booked" may proceed.
+    // A mentee cancellation reopens the slot for booking; a mentor cancellation closes it permanently
+    // (deleted, same as how a mentor removes an unwanted "available" slot elsewhere).
+    const releasedWindow = isMentee
+      ? await AvailabilityWindow.findOneAndUpdate(
+          { _id: availabilityWindow._id, status: "booked" },
+          { $set: { status: "available" } },
+          { new: true }
+        )
+      : await AvailabilityWindow.findOneAndDelete({ _id: availabilityWindow._id, status: "booked" });
 
     if (!releasedWindow) {
       return res.status(409).json({ error: "הפגישה כבר טופלה" });
@@ -436,13 +450,24 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
     );
 
     if (!canceledMeeting) {
-      // The meeting moved out of the scheduled state concurrently: undo the window release
-      // rather than leaving an "available" window whose meeting was never actually canceled.
-      // Guarded on "available" so it never clobbers a slot another mentee has since re-booked.
-      await AvailabilityWindow.findOneAndUpdate(
-        { _id: releasedWindow._id, status: "available" },
-        { $set: { status: "booked" } }
-      );
+      // The meeting moved out of the scheduled state concurrently: undo the window change
+      // rather than leaving a meeting that was never actually canceled with its slot released/closed.
+      if (isMentee) {
+        // Guarded on "available" so it never clobbers a slot another mentee has since re-booked.
+        await AvailabilityWindow.findOneAndUpdate(
+          { _id: releasedWindow._id, status: "available" },
+          { $set: { status: "booked" } }
+        );
+      } else {
+        await AvailabilityWindow.create({
+          _id: releasedWindow._id,
+          mentorId: releasedWindow.mentorId,
+          date: releasedWindow.date,
+          startTime: releasedWindow.startTime,
+          endTime: releasedWindow.endTime,
+          status: "booked",
+        });
+      }
       return res.status(409).json({ error: "הפגישה כבר טופלה" });
     }
 
