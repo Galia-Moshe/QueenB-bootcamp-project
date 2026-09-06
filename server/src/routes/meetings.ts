@@ -291,6 +291,12 @@ router.patch("/:id/approve", requireAuth, async (req: AuthRequest, res, next) =>
     await User.findByIdAndUpdate(scheduledMeeting.mentorId, { $inc: { mentoringSessionsCount: 1 } });
     await User.findByIdAndUpdate(scheduledMeeting.menteeId, { $inc: { menteeSessionsCount: 1 } });
 
+    await Notification.create({
+      recipient: scheduledMeeting.menteeId,
+      type: "meeting_approved",
+      message: `בקשתך לפגישה בתאריך ${formatWindowDate(bookedWindow.date)} בשעה ${bookedWindow.startTime}–${bookedWindow.endTime} אושרה`,
+    });
+
     const populatedMeeting = await Meeting.findById(scheduledMeeting._id)
       .populate("mentorId", "-passwordHash")
       .populate("menteeId", "-passwordHash")
