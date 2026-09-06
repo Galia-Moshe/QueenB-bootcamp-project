@@ -255,6 +255,75 @@ function PendingMeetingCard({
   );
 }
 
+function ScheduledMeetingCard({
+  meeting,
+  onChanged,
+}: {
+  meeting: Meeting;
+  onChanged: (message?: string, severity?: "success" | "error") => void;
+}) {
+  const [error, setError] = useState("");
+  const [canceling, setCanceling] = useState(false);
+
+  const availabilityWindow = getAvailabilityWindow(meeting);
+
+  const cancelMeeting = async () => {
+    if (canceling) return;
+
+    setError("");
+    setCanceling(true);
+
+    try {
+      await api.patch(`/meetings/${meeting._id}/cancel`);
+      onChanged("הפגישה בוטלה בהצלחה", "success");
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        onChanged("הפגישה הזו כבר טופלה. הרשימה עודכנה.", "error");
+      } else {
+        setError(getApiErrorMessage(err));
+      }
+    } finally {
+      setCanceling(false);
+    }
+  };
+
+  return (
+    <SurfaceCard variant="outlined" muted shadow={false}>
+      <Stack spacing={1.5}>
+        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+          <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
+            {otherParticipantName(meeting, "mentee")}
+          </Typography>
+          <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+        </Stack>
+
+        {error && <Alert severity="error">{error}</Alert>}
+
+        {availabilityWindow && (
+          <Box>
+            <Typography variant="body2" color="text.secondary">
+              {formatWindowDate(availabilityWindow.date)}
+            </Typography>
+            <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 800 }}>
+              {availabilityWindow.startTime}–{availabilityWindow.endTime}
+            </Typography>
+          </Box>
+        )}
+
+        <Button
+          variant="outlined"
+          color="error"
+          startIcon={<EventBusyIcon />}
+          disabled={canceling}
+          onClick={cancelMeeting}
+        >
+          {canceling ? "מבטלת..." : "ביטול פגישה"}
+        </Button>
+      </Stack>
+    </SurfaceCard>
+  );
+}
+
 export default function HomePage() {
   const [role, setRole] = useState<MeetingRole>("mentee");
   const [mentorProfile, setMentorProfile] = useState<MentorProfile | null>(null);
@@ -314,6 +383,14 @@ export default function HomePage() {
   const pendingMeetings = meetings.filter(
     (meeting) => !meeting.selectedTime && meeting.status !== "canceled"
   );
+
+  const cancellableScheduledMeetings =
+    role === "mentee"
+      ? meetings.filter(
+          (meeting) => meeting.status === "scheduled" && Boolean(getAvailabilityWindow(meeting))
+        )
+      : [];
+
   const canSwitchRoles = Boolean(mentorProfile);
 
   return (
@@ -398,6 +475,27 @@ export default function HomePage() {
                     onChanged={handleMeetingChanged}
                   />
                 ))
+              )}
+
+              {cancellableScheduledMeetings.length > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                      הפגישות המתוזמנות שלי
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      ניתן לבטל פגישה שנקבעה
+                    </Typography>
+                  </Box>
+                  {cancellableScheduledMeetings.map((meeting) => (
+                    <ScheduledMeetingCard
+                      key={meeting._id}
+                      meeting={meeting}
+                      onChanged={handleMeetingChanged}
+                    />
+                  ))}
+                </>
               )}
             </Stack>
           </SurfaceCard>

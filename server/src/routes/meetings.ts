@@ -358,6 +358,74 @@ router.patch("/:id/reject", requireAuth, async (req: AuthRequest, res, next) => 
   }
 });
 
+router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    if (!isSameId(meeting.menteeId, req.user!._id)) {
+      return res.status(403).json({ error: "רק המנטית של הפגישה יכולה לבטל אותה" });
+    }
+
+    if (meeting.status !== "scheduled") {
+      return res.status(409).json({ error: "אפשר לבטל רק פגישה שאושרה" });
+    }
+
+    if (!meeting.availabilityWindowId) {
+      return res.status(400).json({ error: "לא ניתן לבטל פגישה זו בדרך הזו" });
+    }
+
+    const availabilityWindow = await AvailabilityWindow.findById(meeting.availabilityWindowId);
+    if (!availabilityWindow) {
+      return res.status(404).json({ error: "חלון הזמינות של הפגישה לא נמצא" });
+    }
+
+    if (availabilityWindow.status !== "booked") {
+      return res.status(409).json({ error: "הפגישה כבר טופלה" });
+    }
+
+    // Atomically release the slot: only the cancellation that finds it still "booked" may proceed.
+    const releasedWindow = await AvailabilityWindow.findOneAndUpdate(
+      { _id: availabilityWindow._id, status: "booked" },
+      { $set: { status: "available" } },
+      { new: true }
+    );
+
+    if (!releasedWindow) {
+      return res.status(409).json({ error: "הפגישה כבר טופלה" });
+    }
+
+    const canceledMeeting = await Meeting.findOneAndUpdate(
+      { _id: meeting._id, status: "scheduled" },
+      { $set: { status: "canceled" } },
+      { new: true }
+    );
+
+    if (!canceledMeeting) {
+      // The meeting moved out of the scheduled state concurrently: undo the window release
+      // rather than leaving an "available" window whose meeting was never actually canceled.
+      // Guarded on "available" so it never clobbers a slot another mentee has since re-booked.
+      await AvailabilityWindow.findOneAndUpdate(
+        { _id: releasedWindow._id, status: "available" },
+        { $set: { status: "booked" } }
+      );
+      return res.status(409).json({ error: "הפגישה כבר טופלה" });
+    }
+
+    const populatedMeeting = await Meeting.findById(canceledMeeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.patch("/:id/decline", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
