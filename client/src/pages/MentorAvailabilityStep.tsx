@@ -50,13 +50,20 @@ function formatDayLabel(dateKey: string) {
 }
 
 type Props = {
-  onBack: () => void;
-  onFinish: () => Promise<void>;
-  finishing: boolean;
-  finishError: string;
+  variant?: "setup" | "profile";
+  onBack?: () => void;
+  onFinish?: () => Promise<void>;
+  finishing?: boolean;
+  finishError?: string;
 };
 
-export default function MentorAvailabilityStep({ onBack, onFinish, finishing, finishError }: Props) {
+export default function MentorAvailabilityStep({
+  variant = "setup",
+  onBack,
+  onFinish,
+  finishing = false,
+  finishError = "",
+}: Props) {
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -185,11 +192,14 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
     }
   };
 
+  const isSetup = variant === "setup";
+
   return (
     <Stack spacing={3}>
       <Alert severity="info">
-        אם לא תגדירי זמינות כרגע, תירשמי כמנטורית אך לא תהיי זמינה לקביעת פגישות. ניתן לעדכן את
-        הזמינות שלך בהמשך באזור האישי.
+        {isSetup
+          ? "אם לא תגדירי זמינות כרגע, תירשמי כמנטורית אך לא תהיי זמינה לקביעת פגישות. ניתן לעדכן את הזמינות שלך בהמשך באזור האישי."
+          : "כאן תוכלי לראות, להוסיף ולעדכן את השעות שבהן את זמינה לפגישות."}
       </Alert>
 
       {loadError && <Alert severity="error">{loadError}</Alert>}
@@ -237,14 +247,16 @@ export default function MentorAvailabilityStep({ onBack, onFinish, finishing, fi
         </SurfaceCard>
       )}
 
-      <Stack direction="row" spacing={2} justifyContent="space-between">
-        <Button onClick={onBack} disabled={finishing}>
-          חזרה
-        </Button>
-        <Button variant="contained" onClick={onFinish} disabled={finishing}>
-          {finishing ? "שומרת..." : "סיום הרשמה"}
-        </Button>
-      </Stack>
+      {isSetup && (
+        <Stack direction="row" spacing={2} justifyContent="space-between">
+          <Button onClick={onBack} disabled={finishing}>
+            חזרה
+          </Button>
+          <Button variant="contained" onClick={onFinish} disabled={finishing}>
+            {finishing ? "שומרת..." : "סיום הרשמה"}
+          </Button>
+        </Stack>
+      )}
 
       <Dialog
         open={Boolean(selectedDate)}
