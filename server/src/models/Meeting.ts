@@ -19,6 +19,21 @@ type Feedback = {
   content: string;
 };
 
+export type MeetingParticipantRole = "mentor" | "mentee";
+
+export type AttendanceConfirmationState = {
+  confirmedAt?: Date;
+  reminder24hSentAt?: Date;
+  reminder24hSendingAt?: Date;
+  reminder24hFailedAt?: Date;
+  reminder3hSentAt?: Date;
+  reminder3hSendingAt?: Date;
+  reminder3hFailedAt?: Date;
+  reminderError?: string;
+};
+
+export type AttendanceConfirmation = Record<MeetingParticipantRole, AttendanceConfirmationState>;
+
 export type AttendanceResponses = {
   mentor: (typeof attendanceResponseValues)[number] | null;
   mentee: (typeof attendanceResponseValues)[number] | null;
@@ -39,6 +54,8 @@ export type MeetingDocument = {
   status: MeetingStatus;
   proposedTimes: Date[];
   selectedTime?: Date;
+  scheduledAt?: Date;
+  attendanceConfirmation: AttendanceConfirmation;
   topics?: string[];
   attendancePromptedAt?: Date;
   feedbackReminderAt?: Date;
@@ -47,6 +64,8 @@ export type MeetingDocument = {
   rescheduleInterest: RescheduleInterest;
   rescheduleAttempts: number;
   feedbacks: Feedback[];
+  createdAt?: Date;
+  updatedAt?: Date;
   /** Who canceled this meeting, when status is "canceled". Null/undefined on meetings that
    * predate this field or that never reached "canceled" via a tracked cancellation path. */
   canceledBy?: CanceledBy | null;
@@ -68,6 +87,22 @@ const feedbackSchema = new Schema<Feedback>(
       type: String,
       required: true,
     },
+  },
+  {
+    _id: false,
+  }
+);
+
+const attendanceConfirmationStateSchema = new Schema<AttendanceConfirmationState>(
+  {
+    confirmedAt: Date,
+    reminder24hSentAt: Date,
+    reminder24hSendingAt: Date,
+    reminder24hFailedAt: Date,
+    reminder3hSentAt: Date,
+    reminder3hSendingAt: Date,
+    reminder3hFailedAt: Date,
+    reminderError: String,
   },
   {
     _id: false,
@@ -116,6 +151,17 @@ const meetingSchema = new Schema<MeetingDocument>(
       default: [],
     },
     selectedTime: Date,
+    scheduledAt: Date,
+    attendanceConfirmation: {
+      mentor: {
+        type: attendanceConfirmationStateSchema,
+        default: () => ({}),
+      },
+      mentee: {
+        type: attendanceConfirmationStateSchema,
+        default: () => ({}),
+      },
+    },
     topics: {
       type: [String],
       default: undefined,
@@ -150,6 +196,8 @@ const meetingSchema = new Schema<MeetingDocument>(
     versionKey: false,
   }
 );
+
+meetingSchema.index({ status: 1, selectedTime: 1 });
 
 export type MeetingStatus = (typeof meetingStatuses)[number];
 
