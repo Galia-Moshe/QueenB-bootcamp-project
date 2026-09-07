@@ -44,6 +44,38 @@ router.get("/meetings", async (req, res, next) => {
   }
 });
 
+router.patch("/meetings/:id/status", async (req, res, next) => {
+  try {
+    const { status } = req.body;
+
+    if (typeof status !== "string" || !meetingStatuses.includes(status as (typeof meetingStatuses)[number])) {
+      return res.status(400).json({ error: "סטטוס הפגישה אינו תקין" });
+    }
+
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    meeting.status = status as (typeof meetingStatuses)[number];
+    await meeting.save();
+
+    if (status !== "attendance_confirmed") {
+      await Meeting.updateOne({ _id: meeting._id }, { $unset: { feedbackReminderAt: 1 } });
+    }
+
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("feedbacks.fromUserId", "-passwordHash");
+
+    return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.get("/statistics", async (_req, res, next) => {
   try {
     // --- Step 1: Mentee Statistics ---

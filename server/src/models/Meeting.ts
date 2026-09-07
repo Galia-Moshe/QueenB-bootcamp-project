@@ -8,12 +8,20 @@ export const meetingStatuses = [
   "completed",
   "canceled",
   "feedback_submitted",
+  "disputed",
 ] as const;
+
+export const attendanceResponseValues = ["yes", "no"] as const;
 
 type Feedback = {
   fromUserId: Types.ObjectId;
   role: "mentor" | "mentee";
   content: string;
+};
+
+export type AttendanceResponses = {
+  mentor: (typeof attendanceResponseValues)[number] | null;
+  mentee: (typeof attendanceResponseValues)[number] | null;
 };
 
 export type MeetingDocument = {
@@ -24,6 +32,9 @@ export type MeetingDocument = {
   status: MeetingStatus;
   proposedTimes: Date[];
   selectedTime?: Date;
+  attendancePromptedAt?: Date;
+  feedbackReminderAt?: Date;
+  attendanceResponses: AttendanceResponses;
   rescheduleAttempts: number;
   feedbacks: Feedback[];
 };
@@ -48,6 +59,22 @@ const feedbackSchema = new Schema<Feedback>(
   {
     _id: false,
   }
+);
+
+const attendanceResponsesSchema = new Schema<AttendanceResponses>(
+  {
+    mentor: {
+      type: String,
+      enum: attendanceResponseValues,
+      default: null,
+    },
+    mentee: {
+      type: String,
+      enum: attendanceResponseValues,
+      default: null,
+    },
+  },
+  { _id: false }
 );
 
 const meetingSchema = new Schema<MeetingDocument>(
@@ -76,6 +103,12 @@ const meetingSchema = new Schema<MeetingDocument>(
       default: [],
     },
     selectedTime: Date,
+    attendancePromptedAt: Date,
+    feedbackReminderAt: Date,
+    attendanceResponses: {
+      type: attendanceResponsesSchema,
+      default: () => ({ mentor: null, mentee: null }),
+    },
     rescheduleAttempts: {
       type: Number,
       default: 0,
@@ -94,3 +127,23 @@ const meetingSchema = new Schema<MeetingDocument>(
 export type MeetingStatus = (typeof meetingStatuses)[number];
 
 export const Meeting = model("Meeting", meetingSchema);
+
+/** Convert legacy array-shaped attendanceResponses to { mentor, mentee }. */
+export async function normalizeAttendanceResponsesShape() {
+  const result = await Meeting.collection.updateMany(
+    {
+      $or: [
+        { attendanceResponses: { $type: "array" } },
+        { attendanceResponses: { $exists: false } },
+        { attendanceResponses: null },
+      ],
+    },
+    { $set: { attendanceResponses: { mentor: null, mentee: null } } }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(
+      `Normalized attendanceResponses on ${result.modifiedCount} meeting(s)`
+    );
+  }
+}

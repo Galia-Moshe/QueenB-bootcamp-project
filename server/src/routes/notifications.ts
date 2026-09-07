@@ -50,4 +50,24 @@ router.patch("/read-all", requireAuth, async (req: AuthRequest, res, next) => {
   }
 });
 
+router.delete("/:id", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const notification = await Notification.findById(req.params.id);
+
+    if (!notification) {
+      return res.status(404).json({ error: "ההתראה לא נמצאה" });
+    }
+
+    if (String(notification.recipient) !== String(req.user!._id)) {
+      return res.status(403).json({ error: "אין לך הרשאה למחוק את ההתראה הזו" });
+    }
+
+    await notification.deleteOne();
+
+    return res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 export default router;
