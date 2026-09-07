@@ -23,7 +23,19 @@ import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../../api";
 import SurfaceCard from "../ui/SurfaceCard";
 import TopicSelector from "../mentor-profile/TopicSelector";
-import type { AvailabilityWindow, Meeting, User } from "../../types";
+import type { AvailabilityWindow, Meeting, MeetingStatus, User } from "../../types";
+
+const ACTIVE_MEETING_STATUSES: MeetingStatus[] = [
+  "pending_mentor_times",
+  "pending_mentee_selection",
+  "scheduled",
+];
+
+const ACTIVE_MEETING_WITH_MENTOR_MESSAGE =
+  "You already have an active meeting scheduled with this mentor.";
+
+const ACTIVE_MEETING_WITH_MENTOR_HEBREW =
+  "יש לך כבר פגישה עתידית או בקשה ממתינה עם המנטורית הזו. לא ניתן לקבוע פגישה נוספת עד שהיא תסתיים.";
 
 function toDateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
@@ -58,7 +70,7 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
   const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
-  const [hasScheduledMeetingWithMentor, setHasScheduledMeetingWithMentor] = useState(false);
+  const [hasActiveMeetingWithMentor, setHasActiveMeetingWithMentor] = useState(false);
 
   const fetchAvailability = useCallback(async () => {
     if (!mentor) return;
@@ -70,14 +82,15 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
     return response.data.availabilityWindows;
   }, [mentor]);
 
-  const checkExistingScheduledMeeting = useCallback(async () => {
+  const checkExistingActiveMeeting = useCallback(async () => {
     if (!mentor) return;
 
     const response = await api.get<{ meetings: Meeting[] }>("/meetings/my?role=mentee");
-    const alreadyScheduled = response.data.meetings.some(
-      (meeting) => meeting.status === "scheduled" && meeting.mentorId._id === mentor._id
+    const alreadyActive = response.data.meetings.some(
+      (meeting) =>
+        ACTIVE_MEETING_STATUSES.includes(meeting.status) && meeting.mentorId._id === mentor._id
     );
-    setHasScheduledMeetingWithMentor(alreadyScheduled);
+    setHasActiveMeetingWithMentor(alreadyActive);
   }, [mentor]);
 
   useEffect(() => {
@@ -92,12 +105,12 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
     setSelectedWindowId(null);
     setShowTopicStep(false);
     setSelectedTopics([]);
-    setHasScheduledMeetingWithMentor(false);
+    setHasActiveMeetingWithMentor(false);
 
-    Promise.all([fetchAvailability(), checkExistingScheduledMeeting()])
+    Promise.all([fetchAvailability(), checkExistingActiveMeeting()])
       .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, [open, mentor, fetchAvailability, checkExistingScheduledMeeting]);
+  }, [open, mentor, fetchAvailability, checkExistingActiveMeeting]);
 
   const windowsByDate = useMemo(() => {
     const map = new Map<string, AvailabilityWindow[]>();
@@ -178,21 +191,34 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
       });
       onBooked();
     } catch (err) {
-      setSubmitError(getApiErrorMessage(err));
+      const isActiveMeetingConflict =
+        axios.isAxiosError(err) &&
+        err.response?.status === 400 &&
+        err.response?.data?.message === ACTIVE_MEETING_WITH_MENTOR_MESSAGE;
 
-      if (axios.isAxiosError(err) && err.response?.status === 409) {
+      if (isActiveMeetingConflict) {
+        setSubmitError(ACTIVE_MEETING_WITH_MENTOR_HEBREW);
+        setHasActiveMeetingWithMentor(true);
         setSelectedWindowId(null);
         setShowTopicStep(false);
         setSelectedTopics([]);
+      } else {
+        setSubmitError(getApiErrorMessage(err));
 
-        try {
-          const freshWindows = await fetchAvailability();
-          const stillHasSelectedDate = freshWindows?.some((window) => window.date === selectedDate);
-          if (!stillHasSelectedDate) {
-            setSelectedDate(null);
+        if (axios.isAxiosError(err) && err.response?.status === 409) {
+          setSelectedWindowId(null);
+          setShowTopicStep(false);
+          setSelectedTopics([]);
+
+          try {
+            const freshWindows = await fetchAvailability();
+            const stillHasSelectedDate = freshWindows?.some((window) => window.date === selectedDate);
+            if (!stillHasSelectedDate) {
+              setSelectedDate(null);
+            }
+          } catch {
+            // best-effort refresh; the conflict message above still explains what happened
           }
-        } catch {
-          // best-effort refresh; the conflict message above still explains what happened
         }
       }
     } finally {
@@ -231,10 +257,8 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
             </Box>
           ) : loadError ? (
             <Alert severity="error">{loadError}</Alert>
-          ) : hasScheduledMeetingWithMentor ? (
-            <Alert severity="info">
-              כבר יש לך פגישה מתוזמנת עם המנטורית הזו. אפשר לקבוע פגישה נוספת לאחר שהפגישה הקיימת תסתיים או תבוטל.
-            </Alert>
+          ) : hasActiveMeetingWithMentor ? (
+            <Alert severity="info">{ACTIVE_MEETING_WITH_MENTOR_HEBREW}</Alert>
           ) : windows.length === 0 ? (
             <Alert severity="info">אין כרגע מועדים זמינים אצל המנטורית הזו.</Alert>
           ) : (
