@@ -28,7 +28,10 @@ router.get("/", requireAuth, listMentors);
 router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const mentorProfile = await MentorProfile.findOne({ userId: req.user!._id });
-    return res.json({ mentorProfile });
+    return res.json({
+      mentorProfile,
+      programmingLanguages: req.user!.programmingLanguages || [],
+    });
   } catch (error) {
     next(error);
   }
@@ -36,7 +39,15 @@ router.get("/me", requireAuth, async (req: AuthRequest, res, next) => {
 
 router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { background, topics, maxMeetings, meetingLength, jobTitle, company } = req.body;
+    const {
+      background,
+      topics,
+      maxMeetings,
+      meetingLength,
+      jobTitle,
+      company,
+      programmingLanguages,
+    } = req.body;
 
     const existingProfile = await MentorProfile.findOne({ userId: req.user!._id });
     const wasApproved = existingProfile?.approvalStatus === "approved";
@@ -65,9 +76,20 @@ router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
       }
     ).populate("userId", "-passwordHash");
 
-    if (jobTitle !== undefined || company !== undefined) {
-      req.user!.jobTitle = jobTitle || undefined;
-      req.user!.company = company || undefined;
+    if (
+      jobTitle !== undefined ||
+      company !== undefined ||
+      programmingLanguages !== undefined
+    ) {
+      if (jobTitle !== undefined) {
+        req.user!.jobTitle = jobTitle || undefined;
+      }
+      if (company !== undefined) {
+        req.user!.company = company || undefined;
+      }
+      if (programmingLanguages !== undefined) {
+        req.user!.programmingLanguages = normalizeStringList(programmingLanguages);
+      }
       await req.user!.save();
     }
 
