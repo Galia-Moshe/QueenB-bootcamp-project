@@ -5,9 +5,15 @@ export const notificationTypes = [
   "meeting_approved",
   "meeting_rejected",
   "meeting_canceled",
+  "attendance_check",
+  "feedback_reminder",
+  "attendance_discrepancy",
 ] as const;
 
+export const notificationActionStatuses = ["pending", "awaiting_other", "feedback_choice", "answered"] as const;
+
 export type NotificationType = (typeof notificationTypes)[number];
+export type NotificationActionStatus = (typeof notificationActionStatuses)[number];
 
 export type NotificationDocument = {
   _id: Types.ObjectId;
@@ -15,6 +21,8 @@ export type NotificationDocument = {
   type: NotificationType;
   message: string;
   read: boolean;
+  meetingId?: Types.ObjectId;
+  actionStatus?: NotificationActionStatus;
 };
 
 const notificationSchema = new Schema<NotificationDocument>(
@@ -37,6 +45,14 @@ const notificationSchema = new Schema<NotificationDocument>(
       type: Boolean,
       default: false,
       required: true,
+    },
+    meetingId: {
+      type: Schema.Types.ObjectId,
+      ref: "Meeting",
+    },
+    actionStatus: {
+      type: String,
+      enum: notificationActionStatuses,
     },
   },
   {

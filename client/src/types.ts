@@ -71,7 +71,10 @@ export type MeetingStatus =
   | "attendance_confirmed"
   | "completed"
   | "canceled"
-  | "feedback_submitted";
+  | "feedback_submitted"
+  | "disputed";
+
+export type AttendanceResponseValue = "yes" | "no";
 
 export type Meeting = {
   _id: string;
@@ -82,6 +85,10 @@ export type Meeting = {
   proposedTimes: string[];
   selectedTime?: string;
   rescheduleAttempts: number;
+  attendanceResponses?: {
+    mentor: AttendanceResponseValue | null;
+    mentee: AttendanceResponseValue | null;
+  };
   feedbacks: Array<{
     fromUserId: User | string;
     role: "mentor" | "mentee";
@@ -95,7 +102,12 @@ export type NotificationType =
   | "new_meeting_request"
   | "meeting_approved"
   | "meeting_rejected"
-  | "meeting_canceled";
+  | "meeting_canceled"
+  | "attendance_check"
+  | "feedback_reminder"
+  | "attendance_discrepancy";
+
+export type NotificationActionStatus = "pending" | "awaiting_other" | "feedback_choice" | "answered";
 
 export type NotificationItem = {
   _id: string;
@@ -103,9 +115,12 @@ export type NotificationItem = {
   type: NotificationType;
   message: string;
   read: boolean;
+  meetingId?: string;
+  actionStatus?: NotificationActionStatus;
   createdAt: string;
   updatedAt: string;
 };
+
 
 export const statusLabels: Record<MeetingStatus, string> = {
   pending_mentor_times: "ממתינה לאישור",
@@ -115,6 +130,7 @@ export const statusLabels: Record<MeetingStatus, string> = {
   completed: "התקיימה פגישה",
   canceled: "בוטלה פגישה",
   feedback_submitted: "נשלח משוב",
+  disputed: "במחלוקת",
 };
 
 /** Calendar / chip colors keyed by meeting status */
@@ -126,6 +142,7 @@ export const statusColors: Record<MeetingStatus, string> = {
   completed: "#5B8C5A",
   canceled: "#9E9E9E",
   feedback_submitted: "#6A4C93",
+  disputed: "#C62828",
 };
 
 export const meetingStatusOptions: MeetingStatus[] = [
@@ -136,6 +153,7 @@ export const meetingStatusOptions: MeetingStatus[] = [
   "completed",
   "canceled",
   "feedback_submitted",
+  "disputed",
 ];
 
 /** Response shape of GET /api/admin/statistics */

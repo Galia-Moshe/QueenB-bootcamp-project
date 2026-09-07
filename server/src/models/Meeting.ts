@@ -8,7 +8,10 @@ export const meetingStatuses = [
   "completed",
   "canceled",
   "feedback_submitted",
+  "disputed",
 ] as const;
+
+export const attendanceResponseValues = ["yes", "no"] as const;
 
 type Feedback = {
   fromUserId: Types.ObjectId;
@@ -31,6 +34,11 @@ export type AttendanceConfirmationState = {
 
 export type AttendanceConfirmation = Record<MeetingParticipantRole, AttendanceConfirmationState>;
 
+export type AttendanceResponses = {
+  mentor: (typeof attendanceResponseValues)[number] | null;
+  mentee: (typeof attendanceResponseValues)[number] | null;
+};
+
 export type MeetingDocument = {
   _id: Types.ObjectId;
   mentorId: Types.ObjectId;
@@ -41,6 +49,9 @@ export type MeetingDocument = {
   selectedTime?: Date;
   scheduledAt?: Date;
   attendanceConfirmation: AttendanceConfirmation;
+  attendancePromptedAt?: Date;
+  feedbackReminderAt?: Date;
+  attendanceResponses: AttendanceResponses;
   rescheduleAttempts: number;
   feedbacks: Feedback[];
   createdAt?: Date;
@@ -85,6 +96,22 @@ const attendanceConfirmationStateSchema = new Schema<AttendanceConfirmationState
   }
 );
 
+const attendanceResponsesSchema = new Schema<AttendanceResponses>(
+  {
+    mentor: {
+      type: String,
+      enum: attendanceResponseValues,
+      default: null,
+    },
+    mentee: {
+      type: String,
+      enum: attendanceResponseValues,
+      default: null,
+    },
+  },
+  { _id: false }
+);
+
 const meetingSchema = new Schema<MeetingDocument>(
   {
     mentorId: {
@@ -122,6 +149,12 @@ const meetingSchema = new Schema<MeetingDocument>(
         default: () => ({}),
       },
     },
+    attendancePromptedAt: Date,
+    feedbackReminderAt: Date,
+    attendanceResponses: {
+      type: attendanceResponsesSchema,
+      default: () => ({ mentor: null, mentee: null }),
+    },
     rescheduleAttempts: {
       type: Number,
       default: 0,
@@ -142,3 +175,23 @@ meetingSchema.index({ status: 1, selectedTime: 1 });
 export type MeetingStatus = (typeof meetingStatuses)[number];
 
 export const Meeting = model("Meeting", meetingSchema);
+
+/** Convert legacy array-shaped attendanceResponses to { mentor, mentee }. */
+export async function normalizeAttendanceResponsesShape() {
+  const result = await Meeting.collection.updateMany(
+    {
+      $or: [
+        { attendanceResponses: { $type: "array" } },
+        { attendanceResponses: { $exists: false } },
+        { attendanceResponses: null },
+      ],
+    },
+    { $set: { attendanceResponses: { mentor: null, mentee: null } } }
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(
+      `Normalized attendanceResponses on ${result.modifiedCount} meeting(s)`
+    );
+  }
+}
