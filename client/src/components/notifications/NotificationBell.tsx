@@ -5,14 +5,20 @@ import {
   Box,
   Button,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   IconButton,
   Popover,
+  Snackbar,
   Stack,
   Typography,
 } from "@mui/material";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import CloseIcon from "@mui/icons-material/Close";
+import { useNavigate } from "react-router-dom";
 import { api, getApiErrorMessage } from "../../api";
 import type { Meeting, NotificationItem } from "../../types";
 import { MeetingFeedbackModal } from "../meetings/MeetingFeedbackModal";
@@ -24,7 +30,20 @@ function formatNotificationDate(value: string) {
   }).format(new Date(value));
 }
 
+type RescheduleInterestResponse = {
+  meeting: Meeting;
+  role: "mentor" | "mentee";
+  interested: boolean;
+  bothInterested: boolean;
+  hasAvailableWindows?: boolean;
+  menteeNotified?: boolean;
+  schedulePath?: string;
+  mentorId: string;
+  message?: string;
+};
+
 export default function NotificationBell() {
+  const navigate = useNavigate();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
@@ -33,6 +52,13 @@ export default function NotificationBell() {
   const [actingId, setActingId] = useState<string | null>(null);
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   const [feedbackMeetingId, setFeedbackMeetingId] = useState<string | null>(null);
+  const [toast, setToast] = useState("");
+  const [availabilityPrompt, setAvailabilityPrompt] = useState<{
+    meetingId: string;
+    hasSlots: boolean;
+    followUpMessage?: string;
+  } | null>(null);
+  const [remindingAvailability, setRemindingAvailability] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
@@ -175,6 +201,100 @@ export default function NotificationBell() {
     }
   };
 
+  const handleRescheduleInterest = async (
+    notification: NotificationItem,
+    interested: boolean
+  ) => {
+    if (!notification.meetingId || actingId) return;
+
+    setActingId(notification._id);
+    setActionError("");
+
+    try {
+      const response = await api.patch<RescheduleInterestResponse>(
+        `/meetings/${notification.meetingId}/reschedule-interest`,
+        { interested }
+      );
+
+      updateNotificationStatus(notification, "answered");
+
+      const { role, interested: wantsReschedule, bothInterested, hasAvailableWindows, schedulePath, message } =
+        response.data;
+
+      if (!wantsReschedule) {
+        if (message) setToast(message);
+        return;
+      }
+
+      if (role === "mentor") {
+        handleClose();
+        setAvailabilityPrompt({
+          meetingId: notification.meetingId!,
+          hasSlots: hasAvailableWindows === true,
+          followUpMessage: message,
+        });
+        return;
+      }
+
+      if (bothInterested && schedulePath) {
+        handleClose();
+        navigate(schedulePath);
+        return;
+      }
+
+      if (message) {
+        setToast(message);
+      }
+    } catch (err) {
+      setActionError(getApiErrorMessage(err));
+      fetchNotifications();
+    } finally {
+      setActingId(null);
+    }
+  };
+
+  const handleRescheduleReady = (notification: NotificationItem) => {
+    if (!notification.actionUrl) return;
+
+    updateNotificationStatus(notification, "answered");
+    markAsRead(notification);
+    handleClose();
+    navigate(notification.actionUrl);
+  };
+
+  const handleAvailabilityReminderClick = (notification: NotificationItem) => {
+    updateNotificationStatus(notification, "answered");
+    markAsRead(notification);
+    handleClose();
+    navigate(notification.actionUrl || "/profile?availability=1");
+  };
+
+  const closeAvailabilityPrompt = (showFollowUp = true) => {
+    if (showFollowUp && availabilityPrompt?.followUpMessage) {
+      setToast(availabilityPrompt.followUpMessage);
+    }
+    setAvailabilityPrompt(null);
+  };
+
+  const handleRemindAvailabilityLater = async () => {
+    if (!availabilityPrompt?.meetingId || remindingAvailability) return;
+
+    setRemindingAvailability(true);
+    setActionError("");
+
+    try {
+      const response = await api.patch<{ message?: string }>(
+        `/meetings/${availabilityPrompt.meetingId}/remind-availability`
+      );
+      setAvailabilityPrompt(null);
+      setToast(response.data.message || "תזכורת נקבעה ל־24 שעות.");
+    } catch (err) {
+      setToast(getApiErrorMessage(err));
+    } finally {
+      setRemindingAvailability(false);
+    }
+  };
+
   const handleFeedbackSubmitted = () => {
     setNotifications((current) =>
       current.filter(
@@ -288,8 +408,27 @@ export default function NotificationBell() {
                     notification.meetingId &&
                     notification.actionStatus === "pending";
 
+                  const showRescheduleInquiry =
+                    notification.type === "reschedule_inquiry" &&
+                    notification.meetingId &&
+                    notification.actionStatus === "pending";
+
+                  const showRescheduleReady =
+                    notification.type === "reschedule_ready" &&
+                    Boolean(notification.actionUrl) &&
+                    notification.actionStatus !== "answered";
+
+                  const showAvailabilityReminder =
+                    notification.type === "availability_reminder" &&
+                    notification.actionStatus !== "answered";
+
                   const hasInteractiveActions =
-                    showAttendanceActions || showFeedbackChoice || showFeedbackReminderAction;
+                    showAttendanceActions ||
+                    showFeedbackChoice ||
+                    showFeedbackReminderAction ||
+                    showRescheduleInquiry ||
+                    showRescheduleReady ||
+                    showAvailabilityReminder;
 
                   return (
                     <Box
@@ -410,6 +549,64 @@ export default function NotificationBell() {
                           </Button>
                         </Stack>
                       )}
+
+                      {showRescheduleInquiry && (
+                        <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} useFlexGap flexWrap="wrap">
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={actingId === notification._id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRescheduleInterest(notification, true);
+                            }}
+                          >
+                            כן
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            disabled={actingId === notification._id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRescheduleInterest(notification, false);
+                            }}
+                          >
+                            לא
+                          </Button>
+                        </Stack>
+                      )}
+
+                      {showRescheduleReady && (
+                        <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} useFlexGap>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleRescheduleReady(notification);
+                            }}
+                          >
+                            לקביעת הזמן החדש
+                          </Button>
+                        </Stack>
+                      )}
+
+                      {showAvailabilityReminder && (
+                        <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} useFlexGap>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleAvailabilityReminderClick(notification);
+                            }}
+                          >
+                            להוספת זמנים
+                          </Button>
+                        </Stack>
+                      )}
                     </Box>
                   );
                 })}
@@ -424,6 +621,70 @@ export default function NotificationBell() {
         open={Boolean(feedbackMeetingId)}
         onClose={() => setFeedbackMeetingId(null)}
         onSubmitted={handleFeedbackSubmitted}
+      />
+
+      <Dialog
+        open={Boolean(availabilityPrompt)}
+        onClose={() => closeAvailabilityPrompt(true)}
+      >
+        <DialogTitle sx={{ fontWeight: 900, color: "primary.dark" }}>
+          {availabilityPrompt?.hasSlots ? "זמנים פנויים ביומן" : "הוספת זמינות"}
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            {availabilityPrompt?.hasSlots
+              ? "יש לך סלוטים פנויים ביומן! תרצי להוסיף זמנים נוספים לבחירת המנטית?"
+              : "אין לך זמנים פנויים ביומן כרגע. כדי שהמנטית תוכל לקבוע, יש להוסיף זמנים."}
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, gap: 1, flexWrap: "wrap" }}>
+          {availabilityPrompt?.hasSlots ? (
+            <>
+              <Button
+                onClick={() => {
+                  closeAvailabilityPrompt(true);
+                }}
+              >
+                המשיכי ללא הוספה
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setAvailabilityPrompt(null);
+                  navigate("/profile?availability=1");
+                }}
+              >
+                הוסיפי זמנים נוספים
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                disabled={remindingAvailability}
+                onClick={handleRemindAvailabilityLater}
+              >
+                הזכירי לי מחר (בעוד 24 שעות)
+              </Button>
+              <Button
+                variant="contained"
+                onClick={() => {
+                  setAvailabilityPrompt(null);
+                  navigate("/profile?availability=1");
+                }}
+              >
+                הוסיפי זמנים עכשיו
+              </Button>
+            </>
+          )}
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={Boolean(toast)}
+        autoHideDuration={5000}
+        onClose={() => setToast("")}
+        message={toast}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
       />
     </>
   );

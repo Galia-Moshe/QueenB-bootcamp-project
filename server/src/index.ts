@@ -5,7 +5,7 @@ import helmet from "helmet";
 import morgan from "morgan";
 import path from "path";
 import { connectDatabase } from "./config/database";
-import { startAttendanceCheckJob, startFeedbackReminderJob } from "./jobs/attendanceCheck";
+import { startAttendanceCheckJob, startAvailabilityReminderJob, startFeedbackReminderJob } from "./jobs/attendanceCheck";
 import { normalizeAttendanceResponsesShape } from "./models/Meeting";
 import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
@@ -59,6 +59,7 @@ connectDatabase()
     await normalizeAttendanceResponsesShape();
     startAttendanceCheckJob();
     startFeedbackReminderJob();
+    startAvailabilityReminderJob();
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);

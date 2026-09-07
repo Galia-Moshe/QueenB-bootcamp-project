@@ -26,6 +26,7 @@ import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
 import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
 import SaveIcon from "@mui/icons-material/Save";
+import { useSearchParams } from "react-router-dom";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import TopicSelector from "../components/mentor-profile/TopicSelector";
@@ -448,6 +449,7 @@ function MeetingsCancellationPanel({
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [form, setForm] = useState<ProfileForm>(EMPTY_FORM);
   const [mentorProfile, setMentorProfile] = useState<MentorProfile | null>(null);
@@ -506,6 +508,19 @@ export default function ProfilePage() {
       .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (loading || !mentorProfile) {
+      return;
+    }
+
+    if (searchParams.get("availability") === "1") {
+      setAvailabilityDialogOpen(true);
+      const next = new URLSearchParams(searchParams);
+      next.delete("availability");
+      setSearchParams(next, { replace: true });
+    }
+  }, [loading, mentorProfile, searchParams, setSearchParams]);
 
   const clearSectionMessages = useCallback((section: SectionKey) => {
     setSectionErrors((prev) => ({ ...prev, [section]: "" }));

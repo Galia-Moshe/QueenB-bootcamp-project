@@ -24,6 +24,11 @@ export type AttendanceResponses = {
   mentee: (typeof attendanceResponseValues)[number] | null;
 };
 
+export type RescheduleInterest = {
+  mentor: (typeof attendanceResponseValues)[number] | null;
+  mentee: (typeof attendanceResponseValues)[number] | null;
+};
+
 export type MeetingDocument = {
   _id: Types.ObjectId;
   mentorId: Types.ObjectId;
@@ -34,7 +39,9 @@ export type MeetingDocument = {
   selectedTime?: Date;
   attendancePromptedAt?: Date;
   feedbackReminderAt?: Date;
+  availabilityReminderAt?: Date;
   attendanceResponses: AttendanceResponses;
+  rescheduleInterest: RescheduleInterest;
   rescheduleAttempts: number;
   feedbacks: Feedback[];
 };
@@ -105,7 +112,12 @@ const meetingSchema = new Schema<MeetingDocument>(
     selectedTime: Date,
     attendancePromptedAt: Date,
     feedbackReminderAt: Date,
+    availabilityReminderAt: Date,
     attendanceResponses: {
+      type: attendanceResponsesSchema,
+      default: () => ({ mentor: null, mentee: null }),
+    },
+    rescheduleInterest: {
       type: attendanceResponsesSchema,
       default: () => ({ mentor: null, mentee: null }),
     },
