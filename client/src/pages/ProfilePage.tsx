@@ -344,8 +344,10 @@ function MeetingsCancellationPanel({
   const [error, setError] = useState("");
   const canSwitchRoles = isMentor;
   const effectiveRole = canSwitchRoles ? meetingRole : "mentee";
+  // Scheduled meetings are canceled exclusively from the home calendar (which enforces the
+  // mentee cancellation warning); this panel only handles pre-scheduled/other active statuses.
   const activeMeetings = useMemo(
-    () => meetings.filter((meeting) => meeting.status !== "canceled"),
+    () => meetings.filter((meeting) => meeting.status !== "canceled" && meeting.status !== "scheduled"),
     [meetings]
   );
 

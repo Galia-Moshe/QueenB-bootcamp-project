@@ -188,7 +188,7 @@ router.get("/:mentorId/availability", requireAuth, async (req: AuthRequest, res,
       .select("mentorId date startTime endTime status")
       .sort({ date: 1, startTime: 1 });
 
-    return res.json({ availabilityWindows });
+    return res.json({ availabilityWindows, topics: mentorProfile.topics });
   } catch (error) {
     next(error);
   }

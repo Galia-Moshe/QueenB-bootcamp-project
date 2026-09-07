@@ -22,6 +22,7 @@ import CloseIcon from "@mui/icons-material/Close";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../../api";
 import SurfaceCard from "../ui/SurfaceCard";
+import TopicSelector from "../mentor-profile/TopicSelector";
 import type { AvailabilityWindow, Meeting, User } from "../../types";
 
 function toDateKey(date: Date) {
@@ -42,16 +43,19 @@ function formatDayLabel(dateKey: string) {
 type Props = {
   open: boolean;
   mentor: User | null;
+  topics: string[];
   onClose: () => void;
   onBooked: () => void;
 };
 
-export default function MentorAvailabilityModal({ open, mentor, onClose, onBooked }: Props) {
+export default function MentorAvailabilityModal({ open, mentor, topics, onClose, onBooked }: Props) {
   const [windows, setWindows] = useState<AvailabilityWindow[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedWindowId, setSelectedWindowId] = useState<string | null>(null);
+  const [showTopicStep, setShowTopicStep] = useState(false);
+  const [selectedTopics, setSelectedTopics] = useState<string[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [hasScheduledMeetingWithMentor, setHasScheduledMeetingWithMentor] = useState(false);
@@ -86,6 +90,8 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
     setSubmitError("");
     setSelectedDate(null);
     setSelectedWindowId(null);
+    setShowTopicStep(false);
+    setSelectedTopics([]);
     setHasScheduledMeetingWithMentor(false);
 
     Promise.all([fetchAvailability(), checkExistingScheduledMeeting()])
@@ -128,29 +134,56 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
 
     setSelectedDate(dateKey);
     setSelectedWindowId(null);
+    setShowTopicStep(false);
+    setSelectedTopics([]);
+  };
+
+  const selectWindow = (windowId: string) => {
+    setSelectedWindowId(windowId);
+    setShowTopicStep(false);
+    setSelectedTopics([]);
   };
 
   const handleClose = () => {
     setSelectedDate(null);
     setSelectedWindowId(null);
+    setShowTopicStep(false);
+    setSelectedTopics([]);
     setSubmitError("");
     onClose();
   };
 
+  const handleContinue = () => {
+    if (!selectedWindowId) return;
+    setShowTopicStep(true);
+  };
+
+  const toggleTopic = (topic: string) => {
+    setSelectedTopics((prev) =>
+      prev.includes(topic) ? prev.filter((selected) => selected !== topic) : [...prev, topic]
+    );
+  };
+
   const handleSubmit = async () => {
     if (!selectedWindowId || !mentor || submitting) return;
+    if (topics.length > 0 && selectedTopics.length === 0) return;
 
     setSubmitting(true);
     setSubmitError("");
 
     try {
-      await api.post("/meetings/from-availability", { availabilityWindowId: selectedWindowId });
+      await api.post("/meetings/from-availability", {
+        availabilityWindowId: selectedWindowId,
+        ...(topics.length > 0 ? { topics: selectedTopics } : {}),
+      });
       onBooked();
     } catch (err) {
       setSubmitError(getApiErrorMessage(err));
 
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         setSelectedWindowId(null);
+        setShowTopicStep(false);
+        setSelectedTopics([]);
 
         try {
           const freshWindows = await fetchAvailability();
@@ -273,7 +306,7 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
                         <Button
                           key={window._id}
                           variant={selectedWindowId === window._id ? "contained" : "outlined"}
-                          onClick={() => setSelectedWindowId(window._id)}
+                          onClick={() => selectWindow(window._id)}
                           disabled={submitting}
                         >
                           {window.startTime}–{window.endTime}
@@ -281,21 +314,50 @@ export default function MentorAvailabilityModal({ open, mentor, onClose, onBooke
                       ))}
                     </Stack>
 
+                    {topics.length > 0 && showTopicStep && (
+                      <Box sx={{ mt: 2 }}>
+                        <Typography
+                          variant="subtitle2"
+                          sx={{ color: "primary.dark", fontWeight: 800, mb: 1.5 }}
+                        >
+                          באיזה נושא תרצי להתייעץ?
+                        </Typography>
+                        <TopicSelector
+                          options={topics}
+                          selectedTopics={selectedTopics}
+                          onToggle={toggleTopic}
+                        />
+                      </Box>
+                    )}
+
                     {submitError && (
                       <Alert severity="error" sx={{ mt: 2 }}>
                         {submitError}
                       </Alert>
                     )}
 
-                    <Button
-                      variant="contained"
-                      startIcon={<SendIcon />}
-                      sx={{ mt: 2 }}
-                      disabled={!selectedWindowId || submitting}
-                      onClick={handleSubmit}
-                    >
-                      {submitting ? "שולחת בקשה..." : "שליחת בקשה"}
-                    </Button>
+                    {topics.length > 0 && !showTopicStep ? (
+                      <Button
+                        variant="contained"
+                        sx={{ mt: 2 }}
+                        disabled={!selectedWindowId}
+                        onClick={handleContinue}
+                      >
+                        המשך
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="contained"
+                        startIcon={<SendIcon />}
+                        sx={{ mt: 2 }}
+                        disabled={
+                          !selectedWindowId || (topics.length > 0 && selectedTopics.length === 0) || submitting
+                        }
+                        onClick={handleSubmit}
+                      >
+                        {submitting ? "שולחת בקשה..." : "שליחת בקשה"}
+                      </Button>
+                    )}
                   </Box>
                 </>
               )}

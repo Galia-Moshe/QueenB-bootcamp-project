@@ -10,6 +10,7 @@ export default function ScheduleMentorPage() {
   const { mentorId } = useParams<{ mentorId: string }>();
   const navigate = useNavigate();
   const [mentor, setMentor] = useState<User | null>(null);
+  const [topics, setTopics] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -28,9 +29,13 @@ export default function ScheduleMentorPage() {
       setError("");
 
       try {
-        const response = await api.get<{ user: User }>(`/users/${mentorId}`);
+        const [userResponse, availabilityResponse] = await Promise.all([
+          api.get<{ user: User }>(`/users/${mentorId}`),
+          api.get<{ topics: string[] }>(`/mentors/${mentorId}/availability`),
+        ]);
         if (!cancelled) {
-          setMentor(response.data.user);
+          setMentor(userResponse.data.user);
+          setTopics(availabilityResponse.data.topics);
         }
       } catch (err) {
         if (!cancelled) {
@@ -68,6 +73,7 @@ export default function ScheduleMentorPage() {
       <MentorAvailabilityModal
         open={Boolean(mentor) && !success}
         mentor={mentor}
+        topics={topics}
         onClose={() => navigate("/mentors")}
         onBooked={() => {
           setSuccess(`הבקשה נשלחה אל ${mentor?.username}`);
