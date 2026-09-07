@@ -194,6 +194,19 @@ export function MeetingDetailsModal({
               </Typography>
             </Box>
 
+            {meeting.topics && meeting.topics.length > 0 && (
+              <Box>
+                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.75 }}>
+                  נושאי הפגישה
+                </Typography>
+                <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                  {meeting.topics.map((topic) => (
+                    <Chip key={topic} label={topic} size="small" />
+                  ))}
+                </Stack>
+              </Box>
+            )}
+
             {!meeting.selectedTime && meeting.proposedTimes.length > 0 && (
               <Box>
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>

@@ -84,6 +84,7 @@ export type Meeting = {
   status: MeetingStatus;
   proposedTimes: string[];
   selectedTime?: string;
+  topics?: string[];
   rescheduleAttempts: number;
   attendanceResponses?: {
     mentor: AttendanceResponseValue | null;

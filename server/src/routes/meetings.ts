@@ -79,7 +79,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
 
 router.post("/from-availability", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { availabilityWindowId } = req.body;
+    const { availabilityWindowId, topics } = req.body;
 
     if (!availabilityWindowId || !mongoose.Types.ObjectId.isValid(availabilityWindowId)) {
       return res.status(400).json({ error: "יש לבחור מועד תקין" });
@@ -97,6 +97,17 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
     const mentorProfile = await MentorProfile.findOne({ userId: availabilityWindow.mentorId });
     if (!mentorProfile) {
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
+    }
+
+    if (mentorProfile.topics.length > 0) {
+      const isValidTopicSelection =
+        Array.isArray(topics) &&
+        topics.length > 0 &&
+        topics.every((selected) => typeof selected === "string" && mentorProfile.topics.includes(selected));
+
+      if (!isValidTopicSelection) {
+        return res.status(400).json({ error: "יש לבחור לפחות נושא אחד תקין מתוך רשימת הנושאים של המנטורית" });
+      }
     }
 
     const existingScheduledMeeting = await Meeting.findOne({
@@ -143,6 +154,7 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
         menteeId: req.user!._id,
         status: "pending_mentor_times",
         availabilityWindowId: claimedWindow._id,
+        ...(mentorProfile.topics.length > 0 ? { topics } : {}),
       });
 
       populatedMeeting = await Meeting.findById(meeting._id)

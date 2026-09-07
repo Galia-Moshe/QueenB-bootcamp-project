@@ -272,6 +272,10 @@ export default function MentorsPage() {
       <MentorAvailabilityModal
         open={Boolean(selectedMentor)}
         mentor={selectedMentor}
+        topics={
+          mentors.find((profile) => getMentorUser(profile)?._id === selectedMentor?._id)
+            ?.topics ?? []
+        }
         onClose={() => setSelectedMentor(null)}
         onBooked={() => {
           setSuccess(`הבקשה נשלחה אל ${selectedMentor?.username}`);

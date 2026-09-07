@@ -198,6 +198,13 @@ function PendingMeetingCard({
                 {availabilityWindow.startTime}–{availabilityWindow.endTime}
               </Typography>
             </Box>
+            {meeting.topics && meeting.topics.length > 0 && (
+              <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                {meeting.topics.map((topic) => (
+                  <Chip key={topic} label={topic} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            )}
             <Stack direction="row" spacing={1}>
               <Button
                 variant="contained"
@@ -353,6 +360,14 @@ function ScheduledMeetingCard({
                 {availabilityWindow.startTime}–{availabilityWindow.endTime}
               </Typography>
             </Box>
+          )}
+
+          {meeting.topics && meeting.topics.length > 0 && (
+            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+              {meeting.topics.map((topic) => (
+                <Chip key={topic} label={topic} size="small" variant="outlined" />
+              ))}
+            </Stack>
           )}
 
           <Button

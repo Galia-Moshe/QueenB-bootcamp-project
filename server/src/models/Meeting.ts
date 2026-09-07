@@ -34,6 +34,7 @@ export type MeetingDocument = {
   status: MeetingStatus;
   proposedTimes: Date[];
   selectedTime?: Date;
+  topics?: string[];
   attendancePromptedAt?: Date;
   feedbackReminderAt?: Date;
   attendanceResponses: AttendanceResponses;
@@ -108,6 +109,10 @@ const meetingSchema = new Schema<MeetingDocument>(
       default: [],
     },
     selectedTime: Date,
+    topics: {
+      type: [String],
+      default: undefined,
+    },
     attendancePromptedAt: Date,
     feedbackReminderAt: Date,
     attendanceResponses: {
