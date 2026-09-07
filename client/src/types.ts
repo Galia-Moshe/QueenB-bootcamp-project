@@ -90,6 +90,10 @@ export type Meeting = {
     mentor: AttendanceResponseValue | null;
     mentee: AttendanceResponseValue | null;
   };
+  rescheduleInterest?: {
+    mentor: AttendanceResponseValue | null;
+    mentee: AttendanceResponseValue | null;
+  };
   feedbacks: Array<{
     fromUserId: User | string;
     role: "mentor" | "mentee";
@@ -110,7 +114,10 @@ export type NotificationType =
   | "meeting_canceled"
   | "attendance_check"
   | "feedback_reminder"
-  | "attendance_discrepancy";
+  | "attendance_discrepancy"
+  | "reschedule_inquiry"
+  | "reschedule_ready"
+  | "availability_reminder";
 
 export type NotificationActionStatus = "pending" | "awaiting_other" | "feedback_choice" | "answered";
 
@@ -122,6 +129,7 @@ export type NotificationItem = {
   read: boolean;
   meetingId?: string;
   actionStatus?: NotificationActionStatus;
+  actionUrl?: string;
   createdAt: string;
   updatedAt: string;
 };
