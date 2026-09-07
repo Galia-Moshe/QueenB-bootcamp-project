@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { api, getApiErrorMessage } from "../../api";
 import type { User } from "../../types";
+import { UserProfileLink } from "../UserProfileLink";
 
 export function AdminUsersView() {
   const [users, setUsers] = useState<User[]>([]);
@@ -82,7 +83,9 @@ export function AdminUsersView() {
           <TableBody>
             {users.map((appUser) => (
               <TableRow key={appUser._id}>
-                <TableCell>{appUser.username}</TableCell>
+                <TableCell>
+                  <UserProfileLink userId={appUser._id} userName={appUser.username} />
+                </TableCell>
                 <TableCell>{appUser.email}</TableCell>
                 <TableCell>{appUser.role === "admin" ? "אדמין" : "משתמשת"}</TableCell>
                 <TableCell>{appUser.mentoringSessionsCount}</TableCell>
