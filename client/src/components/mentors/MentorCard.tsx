@@ -3,6 +3,7 @@ import { Avatar, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import type { MentorProfile, User } from "../../types";
 import SurfaceCard from "../ui/SurfaceCard";
+import { UserProfileLink } from "../UserProfileLink";
 
 type MentorCardProps = {
   profile: MentorProfile;
@@ -43,7 +44,9 @@ export default function MentorCard({
           </Avatar>
           <Box>
             <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-              {mentor?.username}
+              {mentor ? (
+                <UserProfileLink userId={mentor._id} userName={mentor.username} />
+              ) : null}
             </Typography>
             <Typography variant="body2" color="text.secondary">
               {[mentor?.jobTitle, mentor?.company].filter(Boolean).join(" · ") || "מנטורית בקהילה"}
