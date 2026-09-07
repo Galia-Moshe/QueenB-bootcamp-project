@@ -19,6 +19,7 @@ import {
   ToggleButtonGroup,
   Typography,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -34,6 +35,7 @@ import SurfaceCard from "../components/ui/SurfaceCard";
 import { MENTOR_TOPIC_OPTIONS } from "../constants/mentorTopics";
 import type { Meeting, MenteeProfile, MentorProfile, User } from "../types";
 import { statusLabels } from "../types";
+import MentorAvailabilityStep from "./MentorAvailabilityStep";
 
 type ProfileResponse = {
   user: User;
@@ -462,6 +464,7 @@ export default function ProfilePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [selectedMeetingRole, setSelectedMeetingRole] = useState<MeetingRole>("mentee");
+  const [availabilityDialogOpen, setAvailabilityDialogOpen] = useState(false);
   const [editingSection, setEditingSection] = useState<SectionKey | null>(null);
   const [savingSection, setSavingSection] = useState<SectionKey | null>(null);
   const [sectionErrors, setSectionErrors] = useState<Partial<Record<SectionKey, string>>>({});
@@ -568,6 +571,12 @@ export default function ProfilePage() {
       setSelectedMeetingRole("mentee");
     }
   }, [isMentor, selectedMeetingRole]);
+
+  useEffect(() => {
+    if (activeProfileRole !== "mentor") {
+      setAvailabilityDialogOpen(false);
+    }
+  }, [activeProfileRole]);
 
   useEffect(() => {
     if (editingSection !== "mentor" && editingSection !== "mentee") {
@@ -812,11 +821,33 @@ export default function ProfilePage() {
         }}
       >
         <Box sx={{ gridColumn: { xs: "auto", lg: 2 }, gridRow: { xs: "auto", lg: 1 } }}>
-          <MeetingsCancellationPanel
-            isMentor={isMentor}
-            meetingRole={selectedMeetingRole}
-            onMeetingRoleChange={setSelectedMeetingRole}
-          />
+          <Stack spacing={3}>
+            <MeetingsCancellationPanel
+              isMentor={isMentor}
+              meetingRole={selectedMeetingRole}
+              onMeetingRoleChange={setSelectedMeetingRole}
+            />
+
+            {isMentor && activeProfileRole === "mentor" && (
+              <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
+                <Stack spacing={1.5}>
+                  <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+                    זמינות לפגישות
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    כאן תוכלי לראות ולעדכן את השעות שבהן את זמינה לפגישות.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<AddIcon />}
+                    onClick={() => setAvailabilityDialogOpen(true)}
+                  >
+                   עריכת שעות פגישה נוספות
+                  </Button>
+                </Stack>
+              </SurfaceCard>
+            )}
+          </Stack>
         </Box>
 
         <SurfaceCard
@@ -1246,6 +1277,24 @@ export default function ProfilePage() {
           </Stack>
         </SurfaceCard>
       </Box>
+
+      <Dialog
+        open={availabilityDialogOpen}
+        onClose={() => setAvailabilityDialogOpen(false)}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ dir: "rtl", sx: { textAlign: "start" } }}
+      >
+        <DialogTitle sx={{ color: "primary.dark", fontWeight: 900 }}>שעות פגישה זמינות</DialogTitle>
+        <DialogContent>
+          <MentorAvailabilityStep variant="profile" />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button startIcon={<CloseIcon />} onClick={() => setAvailabilityDialogOpen(false)}>
+            סגירה
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Stack>
   );
 }
