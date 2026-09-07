@@ -6,6 +6,10 @@ import { MentorProfile } from "../models/MentorProfile";
 import { Notification } from "../models/Notification";
 import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
+import {
+  confirmAttendanceFromToken,
+  queueAttendanceReminderCheck,
+} from "../services/meetingReminderService";
 
 const router = Router();
 
@@ -35,6 +39,71 @@ function formatWindowDate(dateKey: string) {
   const [year, month, day] = dateKey.split("-");
   return `${day}/${month}/${year}`;
 }
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, (character) => {
+    switch (character) {
+      case "&":
+        return "&amp;";
+      case "<":
+        return "&lt;";
+      case ">":
+        return "&gt;";
+      case '"':
+        return "&quot;";
+      case "'":
+        return "&#39;";
+      default:
+        return character;
+    }
+  });
+}
+
+function renderConfirmationPage(title: string, message: string) {
+  return [
+    "<!doctype html>",
+    "<html lang=\"he\" dir=\"rtl\">",
+    "<head>",
+    "<meta charset=\"utf-8\">",
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
+    `<title>${escapeHtml(title)}</title>`,
+    "</head>",
+    "<body>",
+    `<main><h1>${escapeHtml(title)}</h1><p>${escapeHtml(message)}</p></main>`,
+    "</body>",
+    "</html>",
+  ].join("");
+}
+
+function formatConfirmationDateTime(date: Date) {
+  return new Intl.DateTimeFormat("he-IL", {
+    dateStyle: "full",
+    timeStyle: "short",
+    timeZone: process.env.MEETING_TIME_ZONE || "Asia/Jerusalem",
+  }).format(date);
+}
+
+router.get("/confirm-attendance/:token", async (req, res, next) => {
+  try {
+    const result = await confirmAttendanceFromToken(req.params.token);
+
+    if (!result.ok) {
+      return res
+        .status(result.status)
+        .type("html")
+        .send(renderConfirmationPage("אישור ההגעה נכשל", result.message));
+    }
+
+    const title = result.alreadyConfirmed ? "ההגעה כבר אושרה" : "ההגעה אושרה";
+    const message = `אישרנו את ההגעה שלך לפגישה בתאריך ${formatConfirmationDateTime(
+      result.selectedTime
+    )}.`;
+
+    return res.type("html").send(renderConfirmationPage(title, message));
+  } catch (error) {
+    next(error);
+  }
+});
 
 router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
   try {
@@ -229,10 +298,13 @@ router.patch("/:id/select-time", requireAuth, async (req: AuthRequest, res, next
 
     meeting.selectedTime = selectedTime;
     meeting.status = "scheduled";
+    meeting.scheduledAt = new Date();
+    meeting.attendanceConfirmation = { mentor: {}, mentee: {} };
     await meeting.save();
 
     await User.findByIdAndUpdate(meeting.mentorId, { $inc: { mentoringSessionsCount: 1 } });
     await User.findByIdAndUpdate(meeting.menteeId, { $inc: { menteeSessionsCount: 1 } });
+    queueAttendanceReminderCheck(meeting._id);
 
     const populatedMeeting = await Meeting.findById(meeting._id)
       .populate("mentorId", "-passwordHash")
@@ -289,10 +361,18 @@ router.patch("/:id/approve", requireAuth, async (req: AuthRequest, res, next) =>
     }
 
     const selectedTime = new Date(`${bookedWindow.date}T${bookedWindow.startTime}:00`);
+    const scheduledAt = new Date();
 
     const scheduledMeeting = await Meeting.findOneAndUpdate(
       { _id: meeting._id, status: "pending_mentor_times" },
-      { $set: { status: "scheduled", selectedTime } },
+      {
+        $set: {
+          status: "scheduled",
+          selectedTime,
+          scheduledAt,
+          attendanceConfirmation: { mentor: {}, mentee: {} },
+        },
+      },
       { new: true }
     );
 
@@ -314,6 +394,8 @@ router.patch("/:id/approve", requireAuth, async (req: AuthRequest, res, next) =>
       type: "meeting_approved",
       message: `בקשתך לפגישה בתאריך ${formatWindowDate(bookedWindow.date)} בשעה ${bookedWindow.startTime}–${bookedWindow.endTime} אושרה`,
     });
+
+    queueAttendanceReminderCheck(scheduledMeeting._id);
 
     const populatedMeeting = await Meeting.findById(scheduledMeeting._id)
       .populate("mentorId", "-passwordHash")

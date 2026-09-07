@@ -11,6 +11,7 @@ import meetingsRoutes from "./routes/meetings";
 import mentorsRoutes from "./routes/mentors";
 import notificationsRoutes from "./routes/notifications";
 import usersRoutes from "./routes/users";
+import { startMeetingReminderWorker } from "./services/meetingReminderService";
 
 dotenv.config();
 
@@ -57,6 +58,7 @@ connectDatabase()
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/api/health`);
+      startMeetingReminderWorker();
     });
   })
   .catch((error) => {

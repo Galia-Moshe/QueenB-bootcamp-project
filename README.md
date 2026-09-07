@@ -50,6 +50,11 @@ npm.cmd install
 PORT=5000
 MONGO_URI=mongodb://127.0.0.1:27017/queenb-match
 JWT_SECRET=dev-secret-change-me
+SMTP_USER=your-email@gmail.com
+SMTP_PASSWORD=your-16-character-app-password
+SMTP_FROM_EMAIL=your-email@gmail.com
+APP_BASE_URL=http://localhost:5000
+MEETING_TIME_ZONE=Asia/Jerusalem
 ADMIN_EMAIL=admin@queenb.local
 ADMIN_PASSWORD=admin123
 ADMIN_USERNAME=מנהלת קהילה
