@@ -8,6 +8,9 @@ export const notificationTypes = [
   "attendance_check",
   "feedback_reminder",
   "attendance_discrepancy",
+  "reschedule_inquiry",
+  "reschedule_ready",
+  "availability_reminder",
 ] as const;
 
 export const notificationActionStatuses = ["pending", "awaiting_other", "feedback_choice", "answered"] as const;
@@ -23,6 +26,7 @@ export type NotificationDocument = {
   read: boolean;
   meetingId?: Types.ObjectId;
   actionStatus?: NotificationActionStatus;
+  actionUrl?: string;
 };
 
 const notificationSchema = new Schema<NotificationDocument>(
@@ -53,6 +57,9 @@ const notificationSchema = new Schema<NotificationDocument>(
     actionStatus: {
       type: String,
       enum: notificationActionStatuses,
+    },
+    actionUrl: {
+      type: String,
     },
   },
   {
