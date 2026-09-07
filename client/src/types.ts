@@ -94,6 +94,10 @@ export type Meeting = {
     role: "mentor" | "mentee";
     content: string;
   }>;
+  canceledBy?: "mentor" | "mentee" | null;
+  /** Present when this meeting was fetched via GET /meetings/my?role=mentee: how many
+   * qualifying (mentee-initiated) cancellations she already has with this specific mentor. */
+  menteeCancellationCountWithMentor?: number;
   createdAt?: string;
   updatedAt?: string;
 };

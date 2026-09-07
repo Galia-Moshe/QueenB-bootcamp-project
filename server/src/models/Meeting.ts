@@ -24,6 +24,8 @@ export type AttendanceResponses = {
   mentee: (typeof attendanceResponseValues)[number] | null;
 };
 
+export type CanceledBy = "mentor" | "mentee";
+
 export type MeetingDocument = {
   _id: Types.ObjectId;
   mentorId: Types.ObjectId;
@@ -37,6 +39,9 @@ export type MeetingDocument = {
   attendanceResponses: AttendanceResponses;
   rescheduleAttempts: number;
   feedbacks: Feedback[];
+  /** Who canceled this meeting, when status is "canceled". Null/undefined on meetings that
+   * predate this field or that never reached "canceled" via a tracked cancellation path. */
+  canceledBy?: CanceledBy | null;
 };
 
 const feedbackSchema = new Schema<Feedback>(
@@ -116,6 +121,11 @@ const meetingSchema = new Schema<MeetingDocument>(
     feedbacks: {
       type: [feedbackSchema],
       default: [],
+    },
+    canceledBy: {
+      type: String,
+      enum: ["mentor", "mentee"],
+      default: null,
     },
   },
   {

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import mongoose from "mongoose";
+import mongoose, { type HydratedDocument } from "mongoose";
 import { AvailabilityWindow } from "../models/AvailabilityWindow";
-import { Meeting } from "../models/Meeting";
+import { Meeting, type MeetingDocument } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
 import { Notification } from "../models/Notification";
 import { User } from "../models/User";
@@ -11,6 +11,14 @@ const router = Router();
 
 function isSameId(first: unknown, second: unknown) {
   return String(first) === String(second);
+}
+
+/** Id of a possibly-populated ref field: a populated doc's `_id`, or a raw ObjectId/string. */
+function idOf(value: unknown) {
+  if (value && typeof value === "object" && "_id" in value) {
+    return String((value as { _id: unknown })._id);
+  }
+  return String(value);
 }
 
 function parseDateList(value: unknown) {
@@ -101,6 +109,21 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
       return res.status(409).json({ error: "כבר יש לך פגישה מתוזמנת עם המנטורית הזו" });
     }
 
+    // A mentee who canceled two of her own approved meetings with this mentor may never
+    // book her again, regardless of how many active meetings she currently has with her.
+    const qualifyingCancellations = await Meeting.countDocuments({
+      mentorId: availabilityWindow.mentorId,
+      menteeId: req.user!._id,
+      status: "canceled",
+      canceledBy: "mentee",
+    });
+
+    if (qualifyingCancellations >= 2) {
+      return res.status(409).json({
+        error: "לא ניתן לקבוע פגישה נוספת עם המנטורית הזו לאחר ביטולים קודמים מצידך",
+      });
+    }
+
     // Atomically claim the slot: only the request that flips available -> pending may proceed.
     const claimedWindow = await AvailabilityWindow.findOneAndUpdate(
       { _id: availabilityWindowId, status: "available" },
@@ -156,8 +179,42 @@ router.get("/my", requireAuth, async (req: AuthRequest, res, next) => {
       status: { $ne: "canceled" },
     };
 
-    const meetings = await populateMeeting(Meeting.find(filter));
-    return res.json({ meetings });
+    // populate() widens the query's static type past what TS can track through the chain;
+    // the runtime shape is exactly HydratedDocument<MeetingDocument> with ref fields populated.
+    const meetings = (await populateMeeting(Meeting.find(filter))) as HydratedDocument<MeetingDocument>[];
+
+    if (role === "mentor") {
+      return res.json({ meetings });
+    }
+
+    // For a mentee, tell the frontend how many qualifying cancellations she already has with
+    // each mentor shown here, so it can warn before what would become her second one.
+    const mentorIds = Array.from(new Set(meetings.map((meeting) => idOf(meeting.mentorId))));
+
+    const cancellationCounts = mentorIds.length
+      ? await Meeting.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+          {
+            $match: {
+              menteeId: req.user!._id,
+              status: "canceled",
+              canceledBy: "mentee",
+              mentorId: { $in: mentorIds.map((id) => new mongoose.Types.ObjectId(id)) },
+            },
+          },
+          { $group: { _id: "$mentorId", count: { $sum: 1 } } },
+        ])
+      : [];
+
+    const cancellationCountByMentorId = new Map(
+      cancellationCounts.map((entry) => [String(entry._id), entry.count])
+    );
+
+    const meetingsWithCancellationCount = meetings.map((meeting) => ({
+      ...meeting.toObject(),
+      menteeCancellationCountWithMentor: cancellationCountByMentorId.get(idOf(meeting.mentorId)) ?? 0,
+    }));
+
+    return res.json({ meetings: meetingsWithCancellationCount });
   } catch (error) {
     next(error);
   }
@@ -453,7 +510,7 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
 
     const canceledMeeting = await Meeting.findOneAndUpdate(
       { _id: meeting._id, status: "scheduled" },
-      { $set: { status: "canceled" } },
+      { $set: { status: "canceled", canceledBy: isMentee ? "mentee" : "mentor" } },
       { new: true }
     );
 
@@ -508,6 +565,10 @@ router.patch("/:id/decline", requireAuth, async (req: AuthRequest, res, next) =>
 
     if (!isSameId(meeting.mentorId, req.user!._id) && !isSameId(meeting.menteeId, req.user!._id)) {
       return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
+    }
+
+    if (meeting.status === "scheduled") {
+      return res.status(409).json({ error: "לא ניתן לבטל פגישה זו בדרך הזו" });
     }
 
     if (meeting.status !== "canceled") {
