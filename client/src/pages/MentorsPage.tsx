@@ -24,10 +24,16 @@ import MentorFiltersDrawer, {
 import CenteredContent from "../components/ui/CenteredContent";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
-import type { MentorProfile, MentorsPagination, User } from "../types";
+import type { Meeting, MeetingStatus, MentorProfile, MentorsPagination, User } from "../types";
 
 const PAGE_LIMIT = 12;
 const SEARCH_DEBOUNCE_MS = 300;
+
+const ACTIVE_MEETING_STATUSES: MeetingStatus[] = [
+  "pending_mentor_times",
+  "pending_mentee_selection",
+  "scheduled",
+];
 
 function getMentorUser(profile: MentorProfile) {
   return typeof profile.userId === "string" ? null : profile.userId;
@@ -93,6 +99,7 @@ export default function MentorsPage() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [selectedMentor, setSelectedMentor] = useState<User | null>(null);
+  const [activeMentorIds, setActiveMentorIds] = useState<Set<string>>(new Set());
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -116,6 +123,40 @@ export default function MentorsPage() {
     return () => window.clearTimeout(timer);
   }, [searchInput]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadActiveMeetings = async () => {
+      if (!user) {
+        setActiveMentorIds(new Set());
+        return;
+      }
+
+      try {
+        const response = await api.get<{ meetings: Meeting[] }>("/meetings/my?role=mentee");
+        if (cancelled) {
+          return;
+        }
+
+        const mentorIds = new Set(
+          response.data.meetings
+            .filter((meeting) => ACTIVE_MEETING_STATUSES.includes(meeting.status))
+            .map((meeting) => meeting.mentorId._id)
+        );
+        setActiveMentorIds(mentorIds);
+      } catch {
+        if (!cancelled) {
+          // Booking is still blocked by the backend; cards stay enabled as a soft fallback.
+          setActiveMentorIds(new Set());
+        }
+      }
+    };
+
+    loadActiveMeetings();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, success]);
   useEffect(() => {
     let cancelled = false;
 
@@ -234,6 +275,7 @@ export default function MentorsPage() {
             {mentors.map((profile) => {
               const mentor = getMentorUser(profile);
               const isCurrentUser = mentor?._id === user?._id;
+              const hasActiveMeeting = Boolean(mentor && activeMentorIds.has(mentor._id));
 
               return (
                 <MentorCard
@@ -241,6 +283,7 @@ export default function MentorsPage() {
                   profile={profile}
                   mentor={mentor}
                   isCurrentUser={isCurrentUser}
+                  hasActiveMeeting={hasActiveMeeting}
                   onOpenAvailability={setSelectedMentor}
                 />
               );
@@ -278,6 +321,9 @@ export default function MentorsPage() {
         }
         onClose={() => setSelectedMentor(null)}
         onBooked={() => {
+          if (selectedMentor) {
+            setActiveMentorIds((prev) => new Set(prev).add(selectedMentor._id));
+          }
           setSuccess(`הבקשה נשלחה אל ${selectedMentor?.username}`);
           setSelectedMentor(null);
         }}
