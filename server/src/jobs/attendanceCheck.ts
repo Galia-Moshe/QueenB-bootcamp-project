@@ -121,7 +121,7 @@ export function startFeedbackReminderJob() {
       const now = new Date();
 
       const meetings = await Meeting.find({
-        status: "attendance_confirmed",
+        status: { $in: ["attendance_confirmed", "feedback_submitted"] },
         feedbackReminderAt: { $exists: true, $lte: now },
       });
 
@@ -129,7 +129,7 @@ export function startFeedbackReminderJob() {
         const claimed = await Meeting.findOneAndUpdate(
           {
             _id: meeting._id,
-            status: "attendance_confirmed",
+            status: { $in: ["attendance_confirmed", "feedback_submitted"] },
             feedbackReminderAt: { $exists: true, $lte: now },
           },
           { $unset: { feedbackReminderAt: 1 } },
@@ -175,4 +175,53 @@ export function startFeedbackReminderJob() {
   });
 
   console.log("Feedback reminder cron job started (every 15 minutes)");
+}
+
+/**
+ * Every 15 minutes: remind mentors who deferred adding availability after
+ * agreeing to reschedule, then clear availabilityReminderAt.
+ */
+export function startAvailabilityReminderJob() {
+  cron.schedule("*/15 * * * *", async () => {
+    try {
+      const now = new Date();
+
+      const meetings = await Meeting.find({
+        availabilityReminderAt: { $exists: true, $lte: now },
+      });
+
+      for (const meeting of meetings) {
+        const claimed = await Meeting.findOneAndUpdate(
+          {
+            _id: meeting._id,
+            availabilityReminderAt: { $exists: true, $lte: now },
+          },
+          { $unset: { availabilityReminderAt: 1 } },
+          { new: true }
+        );
+
+        if (!claimed) {
+          continue;
+        }
+
+        await Notification.create({
+          recipient: claimed.mentorId,
+          type: "availability_reminder",
+          meetingId: claimed._id,
+          message:
+            "תזכורת: אנא הוסיפי זמנים פנויים ביומן כדי לאפשר תיאום פגישה מחדש",
+          actionUrl: "/profile?availability=1",
+          actionStatus: "pending",
+        });
+      }
+
+      if (meetings.length > 0) {
+        console.log(`Availability reminder: notified for ${meetings.length} meeting(s)`);
+      }
+    } catch (error) {
+      console.error("Availability reminder job failed", error);
+    }
+  });
+
+  console.log("Availability reminder cron job started (every 15 minutes)");
 }

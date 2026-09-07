@@ -6,6 +6,11 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
   Divider,
   FormControlLabel,
   Stack,
@@ -193,6 +198,13 @@ function PendingMeetingCard({
                 {availabilityWindow.startTime}–{availabilityWindow.endTime}
               </Typography>
             </Box>
+            {meeting.topics && meeting.topics.length > 0 && (
+              <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+                {meeting.topics.map((topic) => (
+                  <Chip key={topic} label={topic} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            )}
             <Stack direction="row" spacing={1}>
               <Button
                 variant="contained"
@@ -288,9 +300,11 @@ function ScheduledMeetingCard({
 }) {
   const [error, setError] = useState("");
   const [canceling, setCanceling] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
 
   const availabilityWindow = getAvailabilityWindow(meeting);
   const participant = otherParticipant(meeting, role);
+  const isSecondCancellationWithMentor = meeting.menteeCancellationCountWithMentor === 1;
 
   const cancelMeeting = async () => {
     if (canceling) return;
@@ -300,9 +314,11 @@ function ScheduledMeetingCard({
 
     try {
       await api.patch(`/meetings/${meeting._id}/cancel`);
+      setCancelDialogOpen(false);
       onChanged("הפגישה בוטלה בהצלחה", "success");
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
+        setCancelDialogOpen(false);
         onChanged("הפגישה הזו כבר טופלה. הרשימה עודכנה.", "error");
       } else {
         setError(getApiErrorMessage(err));
@@ -312,40 +328,96 @@ function ScheduledMeetingCard({
     }
   };
 
+  // Mentee cancellations go through a confirmation dialog (with a stronger warning before
+  // what would become her second one with this mentor); mentor cancellations are unchanged.
+  const handleCancelClick = () => {
+    if (role === "mentee") {
+      setCancelDialogOpen(true);
+    } else {
+      cancelMeeting();
+    }
+  };
+
   return (
-    <SurfaceCard variant="outlined" muted shadow={false}>
-      <Stack spacing={1.5}>
-        <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
-          <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
-            <UserProfileLink userId={participant._id} userName={participant.username} />
-          </Typography>
-          <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+    <>
+      <SurfaceCard variant="outlined" muted shadow={false}>
+        <Stack spacing={1.5}>
+          <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+            <Typography sx={{ color: "primary.dark", fontWeight: 800 }}>
+              <UserProfileLink userId={participant._id} userName={participant.username} />
+            </Typography>
+            <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
+          </Stack>
+
+          {error && <Alert severity="error">{error}</Alert>}
+
+          {availabilityWindow && (
+            <Box>
+              <Typography variant="body2" color="text.secondary">
+                {formatWindowDate(availabilityWindow.date)}
+              </Typography>
+              <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 800 }}>
+                {availabilityWindow.startTime}–{availabilityWindow.endTime}
+              </Typography>
+            </Box>
+          )}
+
+          {meeting.topics && meeting.topics.length > 0 && (
+            <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap">
+              {meeting.topics.map((topic) => (
+                <Chip key={topic} label={topic} size="small" variant="outlined" />
+              ))}
+            </Stack>
+          )}
+
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<EventBusyIcon />}
+            disabled={canceling}
+            onClick={handleCancelClick}
+          >
+            {canceling ? "מבטלת..." : "ביטול פגישה"}
+          </Button>
         </Stack>
+      </SurfaceCard>
 
-        {error && <Alert severity="error">{error}</Alert>}
-
-        {availabilityWindow && (
-          <Box>
-            <Typography variant="body2" color="text.secondary">
-              {formatWindowDate(availabilityWindow.date)}
-            </Typography>
-            <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 800 }}>
-              {availabilityWindow.startTime}–{availabilityWindow.endTime}
-            </Typography>
-          </Box>
-        )}
-
-        <Button
-          variant="outlined"
-          color="error"
-          startIcon={<EventBusyIcon />}
-          disabled={canceling}
-          onClick={cancelMeeting}
+      {role === "mentee" && (
+        <Dialog
+          open={cancelDialogOpen}
+          onClose={() => !canceling && setCancelDialogOpen(false)}
+          fullWidth
+          maxWidth="xs"
+          PaperProps={{ dir: "rtl", sx: { textAlign: "start" } }}
         >
-          {canceling ? "מבטלת..." : "ביטול פגישה"}
-        </Button>
-      </Stack>
-    </SurfaceCard>
+          <DialogTitle sx={{ color: "primary.dark", fontWeight: 900 }}>
+            {isSecondCancellationWithMentor ? "שימי לב לפני הביטול" : "ביטול פגישה"}
+          </DialogTitle>
+          <DialogContent>
+            {isSecondCancellationWithMentor ? (
+              <Stack spacing={1.5}>
+                <Alert severity="warning">
+                  זו כבר הפעם השנייה שאת מבטלת פגישה שאושרה עם {participant.username}.
+                </Alert>
+                <DialogContentText>
+                  אם תאשרי את הביטול, לא יהיה ניתן לקבוע יותר פגישות עם {participant.username} בעתיד.
+                </DialogContentText>
+              </Stack>
+            ) : (
+              <DialogContentText>האם את בטוחה שברצונך לבטל את הפגישה?</DialogContentText>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ px: 3, pb: 2 }}>
+            <Button onClick={() => setCancelDialogOpen(false)} disabled={canceling}>
+              חזרה
+            </Button>
+            <Button variant="contained" color="error" onClick={cancelMeeting} disabled={canceling}>
+              {canceling ? "מבטלת..." : "ביטול פגישה"}
+            </Button>
+          </DialogActions>
+        </Dialog>
+      )}
+    </>
   );
 }
 

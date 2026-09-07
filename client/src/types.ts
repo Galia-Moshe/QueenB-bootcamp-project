@@ -84,8 +84,13 @@ export type Meeting = {
   status: MeetingStatus;
   proposedTimes: string[];
   selectedTime?: string;
+  topics?: string[];
   rescheduleAttempts: number;
   attendanceResponses?: {
+    mentor: AttendanceResponseValue | null;
+    mentee: AttendanceResponseValue | null;
+  };
+  rescheduleInterest?: {
     mentor: AttendanceResponseValue | null;
     mentee: AttendanceResponseValue | null;
   };
@@ -94,6 +99,10 @@ export type Meeting = {
     role: "mentor" | "mentee";
     content: string;
   }>;
+  canceledBy?: "mentor" | "mentee" | null;
+  /** Present when this meeting was fetched via GET /meetings/my?role=mentee: how many
+   * qualifying (mentee-initiated) cancellations she already has with this specific mentor. */
+  menteeCancellationCountWithMentor?: number;
   createdAt?: string;
   updatedAt?: string;
 };
@@ -105,7 +114,10 @@ export type NotificationType =
   | "meeting_canceled"
   | "attendance_check"
   | "feedback_reminder"
-  | "attendance_discrepancy";
+  | "attendance_discrepancy"
+  | "reschedule_inquiry"
+  | "reschedule_ready"
+  | "availability_reminder";
 
 export type NotificationActionStatus = "pending" | "awaiting_other" | "feedback_choice" | "answered";
 
@@ -117,6 +129,7 @@ export type NotificationItem = {
   read: boolean;
   meetingId?: string;
   actionStatus?: NotificationActionStatus;
+  actionUrl?: string;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,7 +1,7 @@
 import { Router } from "express";
-import mongoose from "mongoose";
+import mongoose, { type HydratedDocument } from "mongoose";
 import { AvailabilityWindow } from "../models/AvailabilityWindow";
-import { Meeting } from "../models/Meeting";
+import { Meeting, type MeetingDocument } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
 import { Notification } from "../models/Notification";
 import { User } from "../models/User";
@@ -15,6 +15,27 @@ const router = Router();
 
 function isSameId(first: unknown, second: unknown) {
   return String(first) === String(second);
+}
+
+/** Id of a possibly-populated ref field: a populated doc's `_id`, or a raw ObjectId/string. */
+function idOf(value: unknown) {
+  if (value && typeof value === "object" && "_id" in value) {
+    return String((value as { _id: unknown })._id);
+  }
+  return String(value);
+}
+
+/** Both sides confirmed attendance (status and/or attendanceResponses). */
+function isMeetingAttendanceConfirmed(meeting: Pick<MeetingDocument, "status" | "attendanceResponses">) {
+  const bothSaidYes =
+    meeting.attendanceResponses?.mentor === "yes" &&
+    meeting.attendanceResponses?.mentee === "yes";
+
+  return (
+    bothSaidYes ||
+    meeting.status === "attendance_confirmed" ||
+    meeting.status === "feedback_submitted"
+  );
 }
 
 function parseDateList(value: unknown) {
@@ -105,6 +126,52 @@ router.get("/confirm-attendance/:token", async (req, res, next) => {
   }
 });
 
+function toDateKey(date: Date) {
+  // AvailabilityWindow.date is a "YYYY-MM-DD" string — compare with a string, never a Date.
+  // Use local calendar parts so Israel midnight isn't shifted by UTC.
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function toMentorObjectId(mentorId: unknown) {
+  if (mentorId instanceof mongoose.Types.ObjectId) {
+    return mentorId;
+  }
+
+  if (mentorId && typeof mentorId === "object" && "_id" in mentorId) {
+    return toMentorObjectId((mentorId as { _id: unknown })._id);
+  }
+
+  const asString = String(mentorId);
+  if (!mongoose.Types.ObjectId.isValid(asString)) {
+    throw new Error(`Invalid mentorId for availability check: ${asString}`);
+  }
+
+  return new mongoose.Types.ObjectId(asString);
+}
+
+/** Same availability rules as GET /mentors/:mentorId/availability, limited to today+. */
+async function mentorHasFutureAvailability(mentorId: unknown) {
+  const mentorObjectId = toMentorObjectId(mentorId);
+  const todayKey = toDateKey(new Date());
+  const filter = {
+    mentorId: mentorObjectId,
+    status: "available" as const,
+    date: { $gte: todayKey },
+  };
+
+  const count = await AvailabilityWindow.countDocuments(filter);
+
+  console.log("[mentorHasFutureAvailability]", {
+    mentorId: String(mentorObjectId),
+    filter: { ...filter, mentorId: String(mentorObjectId), date: filter.date },
+    count,
+  });
+
+  return count > 0;
+}
+
 router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const { mentorId } = req.body;
@@ -140,7 +207,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
 
 router.post("/from-availability", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const { availabilityWindowId } = req.body;
+    const { availabilityWindowId, topics } = req.body;
 
     if (!availabilityWindowId || !mongoose.Types.ObjectId.isValid(availabilityWindowId)) {
       return res.status(400).json({ error: "יש לבחור מועד תקין" });
@@ -160,6 +227,17 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
     }
 
+    if (mentorProfile.topics.length > 0) {
+      const isValidTopicSelection =
+        Array.isArray(topics) &&
+        topics.length > 0 &&
+        topics.every((selected) => typeof selected === "string" && mentorProfile.topics.includes(selected));
+
+      if (!isValidTopicSelection) {
+        return res.status(400).json({ error: "יש לבחור לפחות נושא אחד תקין מתוך רשימת הנושאים של המנטורית" });
+      }
+    }
+
     const existingScheduledMeeting = await Meeting.findOne({
       mentorId: availabilityWindow.mentorId,
       menteeId: req.user!._id,
@@ -168,6 +246,21 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
 
     if (existingScheduledMeeting) {
       return res.status(409).json({ error: "כבר יש לך פגישה מתוזמנת עם המנטורית הזו" });
+    }
+
+    // A mentee who canceled two of her own approved meetings with this mentor may never
+    // book her again, regardless of how many active meetings she currently has with her.
+    const qualifyingCancellations = await Meeting.countDocuments({
+      mentorId: availabilityWindow.mentorId,
+      menteeId: req.user!._id,
+      status: "canceled",
+      canceledBy: "mentee",
+    });
+
+    if (qualifyingCancellations >= 2) {
+      return res.status(409).json({
+        error: "לא ניתן לקבוע פגישה נוספת עם המנטורית הזו לאחר ביטולים קודמים מצידך",
+      });
     }
 
     // Atomically claim the slot: only the request that flips available -> pending may proceed.
@@ -189,6 +282,7 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
         menteeId: req.user!._id,
         status: "pending_mentor_times",
         availabilityWindowId: claimedWindow._id,
+        ...(mentorProfile.topics.length > 0 ? { topics } : {}),
       });
 
       populatedMeeting = await Meeting.findById(meeting._id)
@@ -225,8 +319,42 @@ router.get("/my", requireAuth, async (req: AuthRequest, res, next) => {
       status: { $ne: "canceled" },
     };
 
-    const meetings = await populateMeeting(Meeting.find(filter));
-    return res.json({ meetings });
+    // populate() widens the query's static type past what TS can track through the chain;
+    // the runtime shape is exactly HydratedDocument<MeetingDocument> with ref fields populated.
+    const meetings = (await populateMeeting(Meeting.find(filter))) as HydratedDocument<MeetingDocument>[];
+
+    if (role === "mentor") {
+      return res.json({ meetings });
+    }
+
+    // For a mentee, tell the frontend how many qualifying cancellations she already has with
+    // each mentor shown here, so it can warn before what would become her second one.
+    const mentorIds = Array.from(new Set(meetings.map((meeting) => idOf(meeting.mentorId))));
+
+    const cancellationCounts = mentorIds.length
+      ? await Meeting.aggregate<{ _id: mongoose.Types.ObjectId; count: number }>([
+          {
+            $match: {
+              menteeId: req.user!._id,
+              status: "canceled",
+              canceledBy: "mentee",
+              mentorId: { $in: mentorIds.map((id) => new mongoose.Types.ObjectId(id)) },
+            },
+          },
+          { $group: { _id: "$mentorId", count: { $sum: 1 } } },
+        ])
+      : [];
+
+    const cancellationCountByMentorId = new Map(
+      cancellationCounts.map((entry) => [String(entry._id), entry.count])
+    );
+
+    const meetingsWithCancellationCount = meetings.map((meeting) => ({
+      ...meeting.toObject(),
+      menteeCancellationCountWithMentor: cancellationCountByMentorId.get(idOf(meeting.mentorId)) ?? 0,
+    }));
+
+    return res.json({ meetings: meetingsWithCancellationCount });
   } catch (error) {
     next(error);
   }
@@ -535,7 +663,7 @@ router.patch("/:id/cancel", requireAuth, async (req: AuthRequest, res, next) => 
 
     const canceledMeeting = await Meeting.findOneAndUpdate(
       { _id: meeting._id, status: "scheduled" },
-      { $set: { status: "canceled" } },
+      { $set: { status: "canceled", canceledBy: isMentee ? "mentee" : "mentor" } },
       { new: true }
     );
 
@@ -590,6 +718,10 @@ router.patch("/:id/decline", requireAuth, async (req: AuthRequest, res, next) =>
 
     if (!isSameId(meeting.mentorId, req.user!._id) && !isSameId(meeting.menteeId, req.user!._id)) {
       return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
+    }
+
+    if (meeting.status === "scheduled") {
+      return res.status(409).json({ error: "לא ניתן לבטל פגישה זו בדרך הזו" });
     }
 
     if (meeting.status !== "canceled") {
@@ -751,6 +883,26 @@ router.patch("/:id/attendance", requireAuth, async (req: AuthRequest, res, next)
       );
     }
 
+    if (outcome === "canceled") {
+      const rescheduleMessage = "הפגישה לא התקיימה. האם תרצי לתאם אותה מחדש?";
+      await Notification.create([
+        {
+          recipient: meeting.mentorId,
+          type: "reschedule_inquiry",
+          meetingId: meeting._id,
+          message: rescheduleMessage,
+          actionStatus: "pending",
+        },
+        {
+          recipient: meeting.menteeId,
+          type: "reschedule_inquiry",
+          meetingId: meeting._id,
+          message: rescheduleMessage,
+          actionStatus: "pending",
+        },
+      ]);
+    }
+
     if (outcome === "disputed") {
       await Notification.create([
         {
@@ -794,15 +946,14 @@ router.patch("/:id/remind-feedback", requireAuth, async (req: AuthRequest, res, 
       return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
     }
 
-    if (meeting.status !== "attendance_confirmed") {
+    if (
+      meeting.status !== "attendance_confirmed" &&
+      meeting.status !== "feedback_submitted"
+    ) {
       return res.status(409).json({ error: "ניתן לקבוע תזכורת משוב רק לאחר אישור שהפגישה התקיימה" });
     }
 
-    const alreadySubmitted = meeting.feedbacks.some((feedback) =>
-      isSameId(feedback.fromUserId, req.user!._id)
-    );
-
-    if (alreadySubmitted) {
+    if (meeting.feedbacks.some((f) => String(f.fromUserId) === String(req.user!._id))) {
       return res.status(409).json({ error: "כבר שלחת משוב לפגישה זו" });
     }
 
@@ -830,6 +981,158 @@ router.patch("/:id/remind-feedback", requireAuth, async (req: AuthRequest, res, 
   }
 });
 
+router.patch("/:id/reschedule-interest", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    const isMentor = isSameId(meeting.mentorId, req.user!._id);
+    const isMentee = isSameId(meeting.menteeId, req.user!._id);
+
+    if (!isMentor && !isMentee) {
+      return res.status(403).json({ error: "אין לך הרשאה לעדכן את הפגישה הזו" });
+    }
+
+    if (meeting.status !== "canceled") {
+      return res.status(409).json({ error: "ניתן לענות על תיאום מחדש רק לפגישה שבוטלה" });
+    }
+
+    if (
+      meeting.attendanceResponses?.mentor !== "no" ||
+      meeting.attendanceResponses?.mentee !== "no"
+    ) {
+      return res.status(409).json({ error: "תיאום מחדש זמין רק כאשר שתיכן דיווחתן שהפגישה לא התקיימה" });
+    }
+
+    const interested = req.body.interested === true || req.body.interested === "true";
+    const notInterested = req.body.interested === false || req.body.interested === "false";
+
+    if (!interested && !notInterested) {
+      return res.status(400).json({ error: "יש לציין האם תרצי לתאם מחדש" });
+    }
+
+    const roleKey = isMentor ? "mentor" : "mentee";
+    const currentInterest = {
+      mentor: meeting.rescheduleInterest?.mentor ?? null,
+      mentee: meeting.rescheduleInterest?.mentee ?? null,
+    };
+
+    if (currentInterest[roleKey] != null) {
+      return res.status(409).json({ error: "כבר ענית על בקשת התיאום מחדש" });
+    }
+
+    currentInterest[roleKey] = interested ? "yes" : "no";
+    meeting.rescheduleInterest = currentInterest;
+    meeting.markModified("rescheduleInterest");
+    await meeting.save();
+
+    await Notification.updateMany(
+      {
+        meetingId: meeting._id,
+        recipient: req.user!._id,
+        type: "reschedule_inquiry",
+        actionStatus: "pending",
+      },
+      { $set: { actionStatus: "answered", read: true } }
+    );
+
+    const schedulePath = `/schedule/${String(meeting.mentorId)}`;
+    const bothInterested =
+      currentInterest.mentor === "yes" && currentInterest.mentee === "yes";
+
+    let hasAvailableWindows: boolean | undefined;
+    let menteeNotified = false;
+
+    if (isMentor && interested) {
+      hasAvailableWindows = await mentorHasFutureAvailability(meeting.mentorId);
+
+      if (currentInterest.mentee === "yes") {
+        await Notification.create({
+          recipient: meeting.menteeId,
+          type: "reschedule_ready",
+          meetingId: meeting._id,
+          message: "המנטורית אישרה! לחצי כאן לקביעת הזמן החדש",
+          actionUrl: schedulePath,
+          actionStatus: "pending",
+        });
+        menteeNotified = true;
+      }
+    }
+
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({
+      meeting: populatedMeeting,
+      role: roleKey,
+      interested,
+      bothInterested,
+      hasAvailableWindows,
+      menteeNotified,
+      schedulePath: bothInterested && isMentee ? schedulePath : undefined,
+      mentorId: String(meeting.mentorId),
+      message: !interested
+        ? "תודה על העדכון."
+        : isMentor
+          ? menteeNotified
+            ? "תודה! שלחנו למנטית קישור לקביעת זמן חדש."
+            : "תודה! נעדכן את המנטית כשהיא תאשר גם."
+          : bothInterested
+            ? "שתיכן מעוניינות בתיאום מחדש. אפשר לקבוע זמן חדש עכשיו."
+            : "מעולה! נמתין לאישור המנטורית ונשלח לך קישור לקביעה מחדש",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:id/remind-availability", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const meeting = await Meeting.findById(req.params.id);
+
+    if (!meeting) {
+      return res.status(404).json({ error: "הפגישה לא נמצאה" });
+    }
+
+    if (!isSameId(meeting.mentorId, req.user!._id)) {
+      return res.status(403).json({ error: "רק המנטורית יכולה לקבוע תזכורת זמינות" });
+    }
+
+    if (meeting.status !== "canceled") {
+      return res.status(409).json({ error: "תזכורת זמינות זמינה רק לפגישה שבוטלה" });
+    }
+
+    if (meeting.rescheduleInterest?.mentor !== "yes") {
+      return res.status(409).json({ error: "ניתן לקבוע תזכורת רק לאחר אישור עניין בתיאום מחדש" });
+    }
+
+    const hasWindows = await mentorHasFutureAvailability(meeting.mentorId);
+    if (hasWindows) {
+      return res.status(409).json({ error: "כבר יש לך זמנים פנויים ביומן" });
+    }
+
+    meeting.availabilityReminderAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await meeting.save();
+
+    const populatedMeeting = await Meeting.findById(meeting._id)
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId");
+
+    return res.json({
+      meeting: populatedMeeting,
+      message: "תזכורת נקבעה. נזכיר לך בעוד 24 שעות להוסיף זמנים פנויים.",
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 router.post("/:id/feedback", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const meeting = await Meeting.findById(req.params.id);
@@ -845,7 +1148,7 @@ router.post("/:id/feedback", requireAuth, async (req: AuthRequest, res, next) =>
       return res.status(403).json({ error: "אין לך הרשאה לשלוח משוב לפגישה הזו" });
     }
 
-    if (meeting.status !== "attendance_confirmed" && meeting.status !== "feedback_submitted") {
+    if (!isMeetingAttendanceConfirmed(meeting)) {
       return res.status(409).json({ error: "ניתן לשלוח משוב רק לאחר אישור שהפגישה התקיימה" });
     }
 

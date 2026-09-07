@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Button, Divider, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, Divider, Stack, Typography } from "@mui/material";
 import SurfaceCard from "../ui/SurfaceCard";
 import { UserProfileLink } from "../UserProfileLink";
 import type { AvailabilityWindow, Meeting, User } from "../../types";
@@ -128,6 +128,19 @@ export function HomeMeetingsSidebar({
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
                         {formatMeetingTime(meeting)}
                       </Typography>
+                      {meeting.topics && meeting.topics.length > 0 && (
+                        <Stack direction="row" spacing={0.5} useFlexGap flexWrap="wrap" sx={{ mt: 0.5 }}>
+                          {meeting.topics.map((topic) => (
+                            <Chip
+                              key={topic}
+                              label={topic}
+                              size="small"
+                              variant="outlined"
+                              sx={{ height: 20, "& .MuiChip-label": { px: 0.75, fontSize: "0.7rem" } }}
+                            />
+                          ))}
+                        </Stack>
+                      )}
                     </Box>
                   );
                 })}
