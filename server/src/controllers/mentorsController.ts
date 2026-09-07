@@ -120,6 +120,11 @@ export async function listMentors(req: Request, res: Response, next: NextFunctio
 
     const pipeline: PipelineStage[] = [
       {
+        $match: {
+          approvalStatus: "approved",
+        },
+      },
+      {
         $lookup: {
           from: "users",
           localField: "userId",

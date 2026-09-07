@@ -1,7 +1,9 @@
 import { Router } from "express";
+import mongoose from "mongoose";
 import { isAdmin, requireAuth } from "../middleware/auth";
 import { Meeting, meetingStatuses } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
+import { Notification } from "../models/Notification";
 import { User } from "../models/User";
 
 const router = Router();
@@ -12,6 +14,125 @@ router.get("/users", async (_req, res, next) => {
   try {
     const users = await User.find().select("-passwordHash").sort({ createdAt: -1 });
     return res.json({ users });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/mentors/requests", async (_req, res, next) => {
+  try {
+    const requests = await MentorProfile.find({ approvalStatus: "pending" })
+      .populate("userId", "-passwordHash")
+      .sort({ createdAt: -1 });
+
+    const unviewedCount = await MentorProfile.countDocuments({
+      approvalStatus: "pending",
+      isViewedByAdmin: false,
+    });
+
+    return res.json({
+      requests,
+      unviewedCount,
+      hasUnviewed: unviewedCount > 0,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/mentors/requests/mark-viewed", async (_req, res, next) => {
+  try {
+    const result = await MentorProfile.updateMany(
+      { approvalStatus: "pending", isViewedByAdmin: false },
+      { $set: { isViewedByAdmin: true } }
+    );
+
+    return res.json({ success: true, modifiedCount: result.modifiedCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/mentors/requests/:id/approve", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "מזהה בקשה לא תקין" });
+    }
+
+    const mentorProfile = await MentorProfile.findById(id);
+
+    if (!mentorProfile) {
+      return res.status(404).json({ error: "בקשת המנטורית לא נמצאה" });
+    }
+
+    if (mentorProfile.approvalStatus !== "pending") {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    mentorProfile.approvalStatus = "approved";
+    mentorProfile.rejectionReason = null;
+    mentorProfile.isViewedByAdmin = true;
+    await mentorProfile.save();
+
+    await Notification.create({
+      recipient: mentorProfile.userId,
+      type: "mentor_approved",
+      message: "בקשתך להפוך למנטורית אושרה! אפשר להתחיל לקבל פגישות.",
+      actionUrl: "/",
+    });
+
+    const populated = await MentorProfile.findById(mentorProfile._id).populate(
+      "userId",
+      "-passwordHash"
+    );
+
+    return res.json({ mentorProfile: populated });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.put("/mentors/requests/:id/reject", async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const rejectionReason =
+      typeof req.body?.rejectionReason === "string" ? req.body.rejectionReason.trim() : "";
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ error: "מזהה בקשה לא תקין" });
+    }
+
+    const mentorProfile = await MentorProfile.findById(id);
+
+    if (!mentorProfile) {
+      return res.status(404).json({ error: "בקשת המנטורית לא נמצאה" });
+    }
+
+    if (mentorProfile.approvalStatus !== "pending") {
+      return res.status(409).json({ error: "הבקשה כבר טופלה" });
+    }
+
+    mentorProfile.approvalStatus = "rejected";
+    mentorProfile.rejectionReason = rejectionReason || null;
+    mentorProfile.isViewedByAdmin = true;
+    await mentorProfile.save();
+
+    const reasonSuffix = rejectionReason ? `סיבה: ${rejectionReason}` : "";
+    await Notification.create({
+      recipient: mentorProfile.userId,
+      type: "mentor_rejected",
+      message: `בקשתך להפוך למנטורית נדחתה.${reasonSuffix}`,
+      actionUrl: "/mentor-profile",
+    });
+
+    const populated = await MentorProfile.findById(mentorProfile._id).populate(
+      "userId",
+      "-passwordHash"
+    );
+
+    return res.json({ mentorProfile: populated });
   } catch (error) {
     next(error);
   }
@@ -95,16 +216,27 @@ router.get("/statistics", async (_req, res, next) => {
         },
       },
       {
+        $addFields: {
+          approvedMentorProfile: {
+            $filter: {
+              input: "$mentorProfile",
+              as: "profile",
+              cond: { $eq: ["$$profile.approvalStatus", "approved"] },
+            },
+          },
+        },
+      },
+      {
         $group: {
           _id: null,
           totalMentees: {
             $sum: {
-              $cond: [{ $eq: [{ $size: "$mentorProfile" }, 0] }, 1, 0],
+              $cond: [{ $eq: [{ $size: "$approvedMentorProfile" }, 0] }, 1, 0],
             },
           },
           totalDualRole: {
             $sum: {
-              $cond: [{ $gt: [{ $size: "$mentorProfile" }, 0] }, 1, 0],
+              $cond: [{ $gt: [{ $size: "$approvedMentorProfile" }, 0] }, 1, 0],
             },
           },
         },
@@ -117,12 +249,13 @@ router.get("/statistics", async (_req, res, next) => {
     };
 
     // --- Step 2: Mentor Statistics ---
-    // All MentorProfiles joined with User to count how many mentors
+    // Approved MentorProfiles joined with User to count how many mentors
     // have actually mentored (mentoringSessionsCount > 0).
     const mentorStatsResult = await MentorProfile.aggregate<{
       totalMentors: number;
       activeMentors: number;
     }>([
+      { $match: { approvalStatus: "approved" } },
       {
         $lookup: {
           from: User.collection.name,
@@ -201,12 +334,13 @@ router.get("/statistics", async (_req, res, next) => {
     const averageRating: number | null = null;
 
     // --- Step 6: Trends & Demand ---
-    // Top topics from MentorProfile; top tech stacks & languages from linked User docs.
+    // Top topics from approved MentorProfile; top tech stacks & languages from linked User docs.
     const demandResult = await MentorProfile.aggregate<{
       topics: Array<{ name: string; count: number }>;
       techStacks: Array<{ name: string; count: number }>;
       programmingLanguages: Array<{ name: string; count: number }>;
     }>([
+      { $match: { approvalStatus: "approved" } },
       {
         $lookup: {
           from: User.collection.name,
@@ -261,6 +395,7 @@ router.get("/statistics", async (_req, res, next) => {
     const mentorsAtCapacityResult = await MentorProfile.aggregate<{ count: number }>([
       {
         $match: {
+          approvalStatus: "approved",
           maxMeetings: { $exists: true, $ne: null, $gt: 0 },
         },
       },
@@ -285,7 +420,7 @@ router.get("/statistics", async (_req, res, next) => {
 
     // --- Step 8: Community Growth ---
     // New users this month (createdAt >= startOfMonth).
-    // Mentor ratio = % of all users who have a MentorProfile.
+    // Mentor ratio = % of all users who have an approved MentorProfile.
     const [newUsersThisMonth, totalUsers] = await Promise.all([
       User.countDocuments({ createdAt: { $gte: startOfMonth } }),
       User.countDocuments(),

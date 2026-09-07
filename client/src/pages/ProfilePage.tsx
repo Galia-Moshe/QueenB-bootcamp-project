@@ -478,7 +478,7 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  const isMentor = Boolean(mentorProfile);
+  const isMentor = mentorProfile?.approvalStatus === "approved";
   const activeProfileRole = isMentor ? selectedMeetingRole : "mentee";
   const avatarSrc = profilePicturePreview || profilePicture || undefined;
 

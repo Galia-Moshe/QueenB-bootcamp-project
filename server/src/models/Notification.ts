@@ -11,6 +11,9 @@ export const notificationTypes = [
   "reschedule_inquiry",
   "reschedule_ready",
   "availability_reminder",
+  "new_mentor_request",
+  "mentor_approved",
+  "mentor_rejected",
 ] as const;
 
 export const notificationActionStatuses = ["pending", "awaiting_other", "feedback_choice", "answered"] as const;

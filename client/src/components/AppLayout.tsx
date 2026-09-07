@@ -40,12 +40,13 @@ export function AppLayout() {
     refreshMentorProfile();
   }, [refreshMentorProfile]);
 
-  const isMentor = Boolean(mentorProfile);
+  const isMentor = mentorProfile?.approvalStatus === "approved";
+  const hasPendingMentorApplication = mentorProfile?.approvalStatus === "pending";
 
   const navItems = [
     { label: "יומן", path: "/", icon: <CalendarMonthIcon /> },
     { label: "מנטוריות", path: "/mentors", icon: <SchoolIcon /> },
-    ...(isMentor
+    ...(isMentor || hasPendingMentorApplication
       ? []
       : [{ label: "הירשמי כמנטורית", path: "/mentor-profile", icon: <PersonAddAlt1Icon /> }]),
   ];

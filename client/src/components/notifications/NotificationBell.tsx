@@ -469,6 +469,7 @@ export default function NotificationBell() {
                           color: "primary.dark",
                           fontWeight: notification.read ? 500 : 800,
                           pl: 2.5,
+                          whiteSpace: "pre-line",
                         }}
                       >
                         {notification.message}

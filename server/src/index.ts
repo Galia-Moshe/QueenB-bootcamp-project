@@ -7,6 +7,7 @@ import path from "path";
 import { connectDatabase } from "./config/database";
 import { startAttendanceCheckJob, startAvailabilityReminderJob, startFeedbackReminderJob } from "./jobs/attendanceCheck";
 import { normalizeAttendanceResponsesShape } from "./models/Meeting";
+import { normalizeMentorApprovalStatuses } from "./models/MentorProfile";
 import adminRoutes from "./routes/admin";
 import authRoutes from "./routes/auth";
 import meetingsRoutes from "./routes/meetings";
@@ -58,6 +59,7 @@ app.use("*", (_req, res) => {
 connectDatabase()
   .then(async () => {
     await normalizeAttendanceResponsesShape();
+    await normalizeMentorApprovalStatuses();
     startAttendanceCheckJob();
     startFeedbackReminderJob();
     startAvailabilityReminderJob();
