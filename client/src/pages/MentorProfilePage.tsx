@@ -34,6 +34,8 @@ export default function MentorProfilePage() {
   const [preferNotToSpecify, setPreferNotToSpecify] = useState(false);
   const [background, setBackground] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
+  const [existingStatus, setExistingStatus] = useState<MentorProfile["approvalStatus"] | null>(null);
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [detailsError, setDetailsError] = useState("");
@@ -49,11 +51,17 @@ export default function MentorProfilePage() {
         if (profile) {
           setBackground(profile.background || "");
           setTopics(profile.topics || []);
+          setExistingStatus(profile.approvalStatus || "approved");
+          setRejectionReason(profile.rejectionReason || null);
+
+          if (profile.approvalStatus === "approved") {
+            navigate("/", { replace: true });
+          }
         }
       })
       .catch((err) => setLoadError(getApiErrorMessage(err)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [navigate]);
 
   const handleTogglePreferNotToSpecify = (checked: boolean) => {
     setPreferNotToSpecify(checked);
@@ -114,6 +122,22 @@ export default function MentorProfilePage() {
     );
   }
 
+  if (existingStatus === "pending") {
+    return (
+      <Stack spacing={3} sx={{ width: "100%" }}>
+        <PageHero
+          title="הרשמה כמנטורית"
+          description="הבקשה שלך ממתינה לאישור מנהלת המערכת."
+        />
+        <SurfaceCard centered sx={{ p: { xs: 2, md: 3 } }}>
+          <Alert severity="info">
+            שלחת בקשה להפוך למנטורית. ברגע שהבקשה תאושר תקבל/י התראה ותוכלי להתחיל לקבל פגישות.
+          </Alert>
+        </SurfaceCard>
+      </Stack>
+    );
+  }
+
   return (
     <Stack spacing={3} sx={{ width: "100%" }}>
       <PageHero
@@ -130,6 +154,12 @@ export default function MentorProfilePage() {
           <Box component="form" onSubmit={handleNext}>
             <Stack spacing={2.5}>
               {loadError && <Alert severity="error">{loadError}</Alert>}
+              {existingStatus === "rejected" && (
+                <Alert severity="warning">
+                  הבקשה הקודמת נדחתה
+                  {rejectionReason ? `: ${rejectionReason}` : "."} אפשר לעדכן את הפרטים ולשלוח שוב.
+                </Alert>
+              )}
               {detailsError && <Alert severity="error">{detailsError}</Alert>}
 
               <Box>

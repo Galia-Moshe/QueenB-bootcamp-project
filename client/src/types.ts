@@ -19,6 +19,8 @@ export type User = {
   updatedAt?: string;
 };
 
+export type MentorApprovalStatus = "pending" | "approved" | "rejected";
+
 export type MentorProfile = {
   _id: string;
   userId: User | string;
@@ -26,6 +28,9 @@ export type MentorProfile = {
   topics: string[];
   maxMeetings?: number;
   meetingLength?: number;
+  approvalStatus?: MentorApprovalStatus;
+  rejectionReason?: string | null;
+  isViewedByAdmin?: boolean;
   hasAvailability?: boolean;
   createdAt?: string;
   updatedAt?: string;
@@ -117,7 +122,10 @@ export type NotificationType =
   | "attendance_discrepancy"
   | "reschedule_inquiry"
   | "reschedule_ready"
-  | "availability_reminder";
+  | "availability_reminder"
+  | "new_mentor_request"
+  | "mentor_approved"
+  | "mentor_rejected";
 
 export type NotificationActionStatus = "pending" | "awaiting_other" | "feedback_choice" | "answered";
 

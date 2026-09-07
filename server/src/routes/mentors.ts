@@ -2,6 +2,7 @@ import { Router } from "express";
 import mongoose from "mongoose";
 import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { MentorProfile } from "../models/MentorProfile";
+import { Notification } from "../models/Notification";
 import { listMentors } from "../controllers/mentorsController";
 import { User } from "../models/User";
 import { requireAuth, type AuthRequest } from "../middleware/auth";
@@ -37,6 +38,9 @@ router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
   try {
     const { background, topics, maxMeetings, meetingLength, jobTitle, company } = req.body;
 
+    const existingProfile = await MentorProfile.findOne({ userId: req.user!._id });
+    const wasApproved = existingProfile?.approvalStatus === "approved";
+
     const mentorProfile = await MentorProfile.findOneAndUpdate(
       { userId: req.user!._id },
       {
@@ -45,11 +49,19 @@ router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
         topics: normalizeStringList(topics),
         maxMeetings,
         meetingLength,
+        ...(wasApproved
+          ? {}
+          : {
+              approvalStatus: "pending",
+              rejectionReason: null,
+              isViewedByAdmin: false,
+            }),
       },
       {
         new: true,
         upsert: true,
         runValidators: true,
+        setDefaultsOnInsert: true,
       }
     ).populate("userId", "-passwordHash");
 
@@ -57,6 +69,22 @@ router.post("/me", requireAuth, async (req: AuthRequest, res, next) => {
       req.user!.jobTitle = jobTitle || undefined;
       req.user!.company = company || undefined;
       await req.user!.save();
+    }
+
+    // Notify admins only for new/pending applications (not approved profile edits).
+    if (!wasApproved) {
+      const admins = await User.find({ role: "admin" }).select("_id");
+      if (admins.length > 0) {
+        const applicantName = req.user!.username;
+        await Notification.insertMany(
+          admins.map((admin) => ({
+            recipient: admin._id,
+            type: "new_mentor_request" as const,
+            message: `${applicantName} הגישה בקשה להפוך למנטורית וממתינה לאישור`,
+            actionUrl: "/admin",
+          }))
+        );
+      }
     }
 
     return res.json({ mentorProfile, user: sanitizeUser(req.user!) });
@@ -176,7 +204,10 @@ router.get("/:mentorId/availability", requireAuth, async (req: AuthRequest, res,
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
     }
 
-    const mentorProfile = await MentorProfile.findOne({ userId: mentorId });
+    const mentorProfile = await MentorProfile.findOne({
+      userId: mentorId,
+      approvalStatus: "approved",
+    });
     if (!mentorProfile) {
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
     }

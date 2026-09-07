@@ -205,7 +205,10 @@ router.post("/", requireAuth, async (req: AuthRequest, res, next) => {
       return res.status(400).json({ error: "אי אפשר לבקש פגישה עם עצמך" });
     }
 
-    const mentorProfile = await MentorProfile.findOne({ userId: mentorId });
+    const mentorProfile = await MentorProfile.findOne({
+      userId: mentorId,
+      approvalStatus: "approved",
+    });
     if (!mentorProfile) {
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
     }
@@ -248,7 +251,10 @@ router.post("/from-availability", requireAuth, async (req: AuthRequest, res, nex
       return res.status(400).json({ error: "אי אפשר לבקש פגישה עם עצמך" });
     }
 
-    const mentorProfile = await MentorProfile.findOne({ userId: availabilityWindow.mentorId });
+    const mentorProfile = await MentorProfile.findOne({
+      userId: availabilityWindow.mentorId,
+      approvalStatus: "approved",
+    });
     if (!mentorProfile) {
       return res.status(404).json({ error: "המנטורית לא נמצאה" });
     }

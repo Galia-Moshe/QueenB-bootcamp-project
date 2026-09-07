@@ -506,7 +506,7 @@ export default function HomePage() {
     Boolean(getAvailabilityWindow(meeting))
   );
 
-  const canSwitchRoles = Boolean(mentorProfile);
+  const canSwitchRoles = mentorProfile?.approvalStatus === "approved";
 
   return (
     <Stack spacing={3}>
