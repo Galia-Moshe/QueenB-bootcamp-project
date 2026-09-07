@@ -15,6 +15,7 @@ import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import type { AppLayoutContext } from "../components/AppLayout";
 import TopicSelector from "../components/mentor-profile/TopicSelector";
+import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import { HELP_AREAS } from "../constants/topics";
@@ -22,6 +23,11 @@ import MentorAvailabilityStep from "./MentorAvailabilityStep";
 import type { MentorProfile } from "../types";
 
 type WizardStep = "details" | "availability";
+
+type MentorMeResponse = {
+  mentorProfile: MentorProfile | null;
+  programmingLanguages?: string[];
+};
 
 export default function MentorProfilePage() {
   const { refreshMentorProfile } = useOutletContext<AppLayoutContext>();
@@ -34,6 +40,9 @@ export default function MentorProfilePage() {
   const [preferNotToSpecify, setPreferNotToSpecify] = useState(false);
   const [background, setBackground] = useState("");
   const [topics, setTopics] = useState<string[]>([]);
+  const [programmingLanguages, setProgrammingLanguages] = useState<string[]>(
+    user?.programmingLanguages || []
+  );
   const [existingStatus, setExistingStatus] = useState<MentorProfile["approvalStatus"] | null>(null);
   const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -44,9 +53,10 @@ export default function MentorProfilePage() {
 
   useEffect(() => {
     api
-      .get<{ mentorProfile: MentorProfile | null }>("/mentors/me")
+      .get<MentorMeResponse>("/mentors/me")
       .then((response) => {
         const profile = response.data.mentorProfile;
+        setProgrammingLanguages(response.data.programmingLanguages || []);
 
         if (profile) {
           setBackground(profile.background || "");
@@ -103,6 +113,7 @@ export default function MentorProfilePage() {
         topics,
         jobTitle,
         company,
+        programmingLanguages,
       });
       refreshMentorProfile();
       await refreshUser();
@@ -216,6 +227,13 @@ export default function MentorProfilePage() {
                   fullWidth
                 />
               </Box>
+
+              <StringListEditor
+                label="שפות תכנות (רשות)"
+                value={programmingLanguages}
+                onChange={setProgrammingLanguages}
+                placeholder="JavaScript, Python..."
+              />
 
               <Box>
                 <Typography variant="subtitle2" sx={{ color: "primary.dark", fontWeight: 800 }}>
