@@ -99,9 +99,9 @@ export default function NotificationItemCard({ notification, actions, compact = 
         p: compact ? 1.25 : 2,
         borderRadius: 1.5,
         cursor: showMentorSummaryLink || (!notification.read && !hasInteractiveActions) ? "pointer" : "default",
-        backgroundColor: notification.read ? "transparent" : "#fce4ec",
+        backgroundColor: notification.read ? "transparent" : "secondary.main",
         border: "1px solid",
-        borderColor: isPending ? "#ec407a" : notification.read ? "#f8bbd0" : "#f48fb1",
+        borderColor: isPending ? "primary.main" : notification.read ? "secondary.main" : "primary.light",
         position: "relative",
         opacity: notification.read && isCompleted ? 0.82 : 1,
       }}

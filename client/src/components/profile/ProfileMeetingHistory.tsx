@@ -87,9 +87,9 @@ function MeetingHistoryItem({
         width: "100%",
         textAlign: "start",
         border: "1px solid",
-        borderColor: "#f8bbd0",
+        borderColor: "secondary.main",
         borderRadius: 1,
-        bgcolor: "#fff7fa",
+        bgcolor: "background.default",
         p: 1.5,
         cursor: "pointer",
         font: "inherit",
@@ -97,8 +97,8 @@ function MeetingHistoryItem({
         transition: "border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease",
         "&:hover": {
           borderColor: "primary.main",
-          bgcolor: "#fce4ec",
-          boxShadow: "0 0 0 2px rgba(236, 64, 122, 0.12)",
+          bgcolor: "secondary.main",
+          boxShadow: "0 0 0 2px rgba(255, 126, 165, 0.16)",
         },
         "&:focus-visible": {
           outline: "2px solid",

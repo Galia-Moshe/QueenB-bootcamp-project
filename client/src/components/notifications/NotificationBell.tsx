@@ -43,11 +43,11 @@ export default function NotificationBell() {
         onClick={handleOpen}
         aria-label="התראות"
         sx={{
-          color: "#ffffff",
-          border: "1px solid rgba(255, 255, 255, 0.32)",
-          backgroundColor: "rgba(255, 255, 255, 0.14)",
+          color: "text.primary",
+          border: "1px solid rgba(61, 44, 46, 0.16)",
+          backgroundColor: "rgba(61, 44, 46, 0.08)",
           "&:hover": {
-            backgroundColor: "rgba(255, 255, 255, 0.24)",
+            backgroundColor: "rgba(61, 44, 46, 0.14)",
           },
         }}
       >
@@ -68,9 +68,10 @@ export default function NotificationBell() {
             maxWidth: "90vw",
             maxHeight: 480,
             mt: 1,
-            border: "1px solid #f8bbd0",
+            border: "1px solid",
+            borderColor: "secondary.main",
             borderRadius: 2,
-            boxShadow: "0 18px 48px rgba(136, 14, 79, 0.16)",
+            boxShadow: "0 18px 48px rgba(255, 126, 165, 0.16)",
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",

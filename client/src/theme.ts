@@ -1,22 +1,35 @@
 import { createTheme } from "@mui/material/styles";
 
+/** Peach & Flamingo palette */
+const flamingo = "#FF7EA5";
+const flamingoLight = "#FFA8C4";
+const flamingoDark = "#E5688F";
+const softPeach = "#FFD8C8";
+const icePeach = "#FFF8F6";
+const darkAccent = "#3D2C2E";
+
 const theme = createTheme({
   direction: "rtl",
   palette: {
     primary: {
-      light: "#ec407a",
-      main: "#d81b60",
-      dark: "#ad1457",
-      contrastText: "#ffffff",
+      light: flamingoLight,
+      main: flamingo,
+      dark: flamingoDark,
+      contrastText: darkAccent,
     },
     secondary: {
-      light: "#f8bbd0",
-      main: "#ea95b7",
-      dark: "#c2185b",
+      light: icePeach,
+      main: softPeach,
+      dark: "#E8B5A3",
+      contrastText: darkAccent,
     },
     background: {
-      default: "#fff5f8",
+      default: icePeach,
       paper: "#FFFFFF",
+    },
+    text: {
+      primary: darkAccent,
+      secondary: "rgba(61, 44, 46, 0.72)",
     },
     success: {
       main: "#2E7D62",
@@ -54,7 +67,7 @@ const theme = createTheme({
       styleOverrides: {
         root: {
           backgroundImage: "none",
-          borderColor: "#f8bbd0",
+          borderColor: softPeach,
         },
       },
     },
@@ -68,25 +81,27 @@ const theme = createTheme({
           textTransform: "none",
         },
         containedPrimary: {
-          backgroundColor: "#d81b60",
-          boxShadow: "0 10px 24px rgba(216, 27, 96, 0.2)",
+          backgroundColor: flamingo,
+          color: darkAccent,
+          boxShadow: "0 10px 24px rgba(255, 126, 165, 0.28)",
           "&:hover": {
-            backgroundColor: "#ad1457",
-            boxShadow: "0 12px 28px rgba(173, 20, 87, 0.24)",
+            backgroundColor: flamingoDark,
+            color: darkAccent,
+            boxShadow: "0 12px 28px rgba(229, 104, 143, 0.32)",
           },
         },
         outlinedPrimary: {
-          borderColor: "#f8bbd0",
-          color: "#ad1457",
+          borderColor: softPeach,
+          color: darkAccent,
           "&:hover": {
-            borderColor: "#ec407a",
-            backgroundColor: "#fff7fa",
+            borderColor: flamingo,
+            backgroundColor: icePeach,
           },
         },
         textPrimary: {
-          color: "#ad1457",
+          color: darkAccent,
           "&:hover": {
-            backgroundColor: "#fff7fa",
+            backgroundColor: icePeach,
           },
         },
       },
@@ -94,15 +109,15 @@ const theme = createTheme({
     MuiOutlinedInput: {
       styleOverrides: {
         root: {
-          backgroundColor: "#fff7fa",
+          backgroundColor: icePeach,
           "& .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#f8bbd0",
+            borderColor: softPeach,
           },
           "&:hover .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#ec407a",
+            borderColor: flamingo,
           },
           "&.Mui-focused .MuiOutlinedInput-notchedOutline": {
-            borderColor: "#d81b60",
+            borderColor: flamingo,
           },
         },
       },
@@ -110,9 +125,9 @@ const theme = createTheme({
     MuiInputLabel: {
       styleOverrides: {
         root: {
-          color: "#ad1457",
+          color: darkAccent,
           "&.Mui-focused": {
-            color: "#d81b60",
+            color: flamingoDark,
           },
         },
       },
@@ -120,7 +135,7 @@ const theme = createTheme({
     MuiFormHelperText: {
       styleOverrides: {
         root: {
-          color: "#ad1457",
+          color: darkAccent,
         },
       },
     },
@@ -132,44 +147,44 @@ const theme = createTheme({
           transition: "background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease",
         },
         filled: {
-          backgroundColor: "#fff0f5",
-          color: "#ad1457",
+          backgroundColor: softPeach,
+          color: darkAccent,
         },
         filledPrimary: {
-          backgroundColor: "#d81b60",
-          color: "#ffffff",
-          boxShadow: "0 8px 18px rgba(216, 27, 96, 0.24)",
+          backgroundColor: flamingo,
+          color: darkAccent,
+          boxShadow: "0 8px 18px rgba(255, 126, 165, 0.28)",
           "&:hover": {
-            backgroundColor: "#ad1457",
-            color: "#ffffff",
+            backgroundColor: flamingoDark,
+            color: darkAccent,
           },
           "&:focus-visible": {
-            backgroundColor: "#ad1457",
-            color: "#ffffff",
+            backgroundColor: flamingoDark,
+            color: darkAccent,
           },
         },
         outlined: {
-          borderColor: "#f8bbd0",
-          color: "#ad1457",
+          borderColor: softPeach,
+          color: darkAccent,
           backgroundColor: "#ffffff",
           "&:hover": {
-            borderColor: "#ec407a",
-            backgroundColor: "#fff0f5",
-            color: "#ad1457",
+            borderColor: flamingo,
+            backgroundColor: icePeach,
+            color: darkAccent,
           },
         },
         colorPrimary: {
-          backgroundColor: "#d81b60",
-          color: "#ffffff",
+          backgroundColor: flamingo,
+          color: darkAccent,
         },
         clickableColorPrimary: {
           "&:hover": {
-            backgroundColor: "#ad1457",
-            color: "#ffffff",
+            backgroundColor: flamingoDark,
+            color: darkAccent,
           },
           "&:focus-visible": {
-            backgroundColor: "#ad1457",
-            color: "#ffffff",
+            backgroundColor: flamingoDark,
+            color: darkAccent,
           },
         },
       },
@@ -178,23 +193,23 @@ const theme = createTheme({
       styleOverrides: {
         switchBase: {
           "&.Mui-checked": {
-            color: "#d81b60",
+            color: flamingo,
           },
           "&.Mui-checked + .MuiSwitch-track": {
-            backgroundColor: "#d81b60",
+            backgroundColor: flamingo,
           },
         },
         track: {
-          backgroundColor: "#f8bbd0",
+          backgroundColor: softPeach,
         },
       },
     },
     MuiCheckbox: {
       styleOverrides: {
         root: {
-          color: "#c2185b",
+          color: flamingoDark,
           "&.Mui-checked": {
-            color: "#d81b60",
+            color: flamingo,
           },
         },
       },
@@ -206,19 +221,19 @@ const theme = createTheme({
           fontWeight: 600,
         },
         standardInfo: {
-          backgroundColor: "#fff0f5",
-          color: "#8f164f",
+          backgroundColor: softPeach,
+          color: darkAccent,
         },
       },
     },
     MuiTableCell: {
       styleOverrides: {
         head: {
-          color: "#ad1457",
+          color: darkAccent,
           fontWeight: 800,
         },
         root: {
-          borderColor: "#f8bbd0",
+          borderColor: softPeach,
         },
       },
     },

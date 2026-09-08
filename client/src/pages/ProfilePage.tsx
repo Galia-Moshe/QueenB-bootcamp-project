@@ -693,9 +693,10 @@ export default function ProfilePage() {
                   sx={{
                     width: 128,
                     height: 128,
-                    color: "#ffffff",
-                    background: "linear-gradient(135deg, #ec407a 0%, #ea95b7 100%)",
-                    border: "2px solid #f8bbd0",
+                    color: "primary.contrastText",
+                    background: "linear-gradient(135deg, #FF7EA5 0%, #FFD8C8 100%)",
+                    border: "2px solid",
+                    borderColor: "secondary.main",
                     fontSize: 44,
                     fontWeight: 900,
                   }}

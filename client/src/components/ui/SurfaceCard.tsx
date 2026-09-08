@@ -28,10 +28,11 @@ export default function SurfaceCard({
       sx={[
         {
           p: 2,
-          border: "1px solid #f8bbd0",
+          border: "1px solid",
+          borderColor: "secondary.main",
           borderRadius: 2,
-          backgroundColor: muted ? "#fff7fa" : "#ffffff",
-          boxShadow: shadow ? "0 18px 48px rgba(136, 14, 79, 0.1)" : "none",
+          backgroundColor: muted ? "background.default" : "#ffffff",
+          boxShadow: shadow ? "0 18px 48px rgba(255, 126, 165, 0.12)" : "none",
         },
         centered
           ? {

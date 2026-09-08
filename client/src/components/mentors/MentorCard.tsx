@@ -51,9 +51,10 @@ export default function MentorCard({
               sx={{
                 width: 56,
                 height: 56,
-                color: "#ffffff",
-                background: "linear-gradient(135deg, #ec407a 0%, #ea95b7 100%)",
-                border: "2px solid #f8bbd0",
+                color: "primary.contrastText",
+                background: "linear-gradient(135deg, #FF7EA5 0%, #FFD8C8 100%)",
+                border: "2px solid",
+                borderColor: "secondary.main",
                 fontWeight: 900,
                 flexShrink: 0,
               }}

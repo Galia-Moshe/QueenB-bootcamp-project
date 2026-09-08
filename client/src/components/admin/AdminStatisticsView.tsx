@@ -22,8 +22,8 @@ function StatCard({ label, value }: { label: string; value: string | number }) {
     <Card
       variant="outlined"
       sx={{
-        borderColor: "#f8bbd0",
-        backgroundColor: "#fff7fa",
+        borderColor: "secondary.main",
+        backgroundColor: "background.default",
         minWidth: 140,
         flex: "1 1 140px",
       }}
@@ -48,7 +48,7 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Card sx={{ borderRadius: 2, border: "1px solid #f8bbd0" }}>
+    <Card sx={{ borderRadius: 2, border: "1px solid", borderColor: "secondary.main" }}>
       <CardContent>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 800 }}>
           {title}
@@ -67,7 +67,7 @@ function DemandList({
   items: Array<{ name: string; count: number }>;
 }) {
   return (
-    <Card variant="outlined" sx={{ borderColor: "#f8bbd0", flex: "1 1 220px", minWidth: 220 }}>
+    <Card variant="outlined" sx={{ borderColor: "secondary.main", flex: "1 1 220px", minWidth: 220 }}>
       <CardContent>
         <Typography variant="subtitle1" sx={{ mb: 1.5, fontWeight: 800 }}>
           {title}

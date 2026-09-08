@@ -54,14 +54,14 @@ export function AppLayout() {
   const navButtonSx = (active: boolean) => ({
     minHeight: 38,
     px: 1.5,
-    color: active ? "primary.main" : "#ffffff",
-    backgroundColor: active ? "#ffffff" : "rgba(255, 255, 255, 0.14)",
-    border: "1px solid rgba(255, 255, 255, 0.32)",
-    boxShadow: active ? "0 8px 18px rgba(136, 14, 79, 0.14)" : "none",
+    color: active ? "primary.main" : "text.primary",
+    backgroundColor: active ? "#ffffff" : "rgba(61, 44, 46, 0.08)",
+    border: "1px solid rgba(61, 44, 46, 0.16)",
+    boxShadow: active ? "0 8px 18px rgba(255, 126, 165, 0.18)" : "none",
     "&:hover": {
-      color: active ? "primary.dark" : "#ffffff",
-      backgroundColor: active ? "#fff7fa" : "rgba(255, 255, 255, 0.24)",
-      boxShadow: active ? "0 8px 18px rgba(136, 14, 79, 0.14)" : "none",
+      color: active ? "primary.dark" : "text.primary",
+      backgroundColor: active ? "background.default" : "rgba(61, 44, 46, 0.14)",
+      boxShadow: active ? "0 8px 18px rgba(255, 126, 165, 0.18)" : "none",
     },
     "& .MuiButton-startIcon": {
       color: "inherit",
@@ -75,13 +75,13 @@ export function AppLayout() {
         color="inherit"
         elevation={0}
         sx={{
-          color: "#ffffff",
-          background: "linear-gradient(135deg, #ec407a 0%, #ea95b7 100%)",
-          boxShadow: "0 10px 26px rgba(236, 64, 122, 0.2)",
+          color: "text.primary",
+          background: "linear-gradient(135deg, #FF7EA5 0%, #FFD8C8 100%)",
+          boxShadow: "0 10px 26px rgba(255, 126, 165, 0.22)",
         }}
       >
         <Toolbar sx={{ gap: 2, flexWrap: "wrap", py: { xs: 1.5, sm: 1 }, minHeight: { xs: "auto", sm: 72 } }}>
-          <Typography variant="h6" component="div" sx={{ color: "#ffffff", fontWeight: 900 }}>
+          <Typography variant="h6" component="div" sx={{ color: "text.primary", fontWeight: 900 }}>
             QueenB Match
           </Typography>
 
@@ -135,11 +135,11 @@ export function AppLayout() {
               onClick={logout}
               sx={{
                 minHeight: 38,
-                color: "#ffffff",
-                border: "1px solid rgba(255, 255, 255, 0.32)",
-                backgroundColor: "rgba(255, 255, 255, 0.14)",
+                color: "text.primary",
+                border: "1px solid rgba(61, 44, 46, 0.16)",
+                backgroundColor: "rgba(61, 44, 46, 0.08)",
                 "&:hover": {
-                  backgroundColor: "rgba(255, 255, 255, 0.24)",
+                  backgroundColor: "rgba(61, 44, 46, 0.14)",
                 },
               }}
             >
