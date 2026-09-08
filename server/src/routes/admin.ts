@@ -1,12 +1,55 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import { isAdmin, requireAuth } from "../middleware/auth";
+import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { Meeting, meetingStatuses } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
 import { Notification } from "../models/Notification";
 import { User } from "../models/User";
 
 const router = Router();
+
+const DEFAULT_MEETING_DURATION_MINUTES = 60;
+const MISSING_FEEDBACK_DAYS = 7;
+const OUTSTANDING_MENTOR_SESSION_THRESHOLD = 10;
+
+async function getMeetingEndTime(meeting: {
+  selectedTime?: Date;
+  mentorId: unknown;
+  availabilityWindowId?: unknown;
+}): Promise<Date | null> {
+  if (!meeting.selectedTime) {
+    return null;
+  }
+
+  if (meeting.availabilityWindowId) {
+    const windowId =
+      meeting.availabilityWindowId &&
+      typeof meeting.availabilityWindowId === "object" &&
+      "_id" in (meeting.availabilityWindowId as object)
+        ? (meeting.availabilityWindowId as { _id: unknown })._id
+        : meeting.availabilityWindowId;
+    const window = await AvailabilityWindow.findById(windowId);
+    if (window) {
+      return new Date(`${window.date}T${window.endTime}:00`);
+    }
+  }
+
+  const mentorUserId =
+    meeting.mentorId &&
+    typeof meeting.mentorId === "object" &&
+    "_id" in (meeting.mentorId as object)
+      ? (meeting.mentorId as { _id: unknown })._id
+      : meeting.mentorId;
+
+  const mentorProfile = await MentorProfile.findOne({ userId: mentorUserId });
+  const durationMinutes =
+    mentorProfile?.meetingLength && mentorProfile.meetingLength > 0
+      ? mentorProfile.meetingLength
+      : DEFAULT_MEETING_DURATION_MINUTES;
+
+  return new Date(meeting.selectedTime.getTime() + durationMinutes * 60 * 1000);
+}
 
 router.use(requireAuth, isAdmin);
 
@@ -192,6 +235,46 @@ router.patch("/meetings/:id/status", async (req, res, next) => {
       .populate("feedbacks.fromUserId", "-passwordHash");
 
     return res.json({ meeting: populatedMeeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/alerts", async (_req, res, next) => {
+  try {
+    const now = new Date();
+    const oneWeekAgo = new Date(now.getTime() - MISSING_FEEDBACK_DAYS * 24 * 60 * 60 * 1000);
+
+    const [disputes, attendanceConfirmedCandidates, outstandingMentors] = await Promise.all([
+      Meeting.find({ status: "disputed" })
+        .populate("mentorId", "username email mentoringSessionsCount")
+        .populate("menteeId", "username email menteeSessionsCount")
+        .sort({ updatedAt: -1 }),
+      Meeting.find({
+        status: "attendance_confirmed",
+        selectedTime: { $exists: true, $lt: oneWeekAgo },
+      })
+        .populate("mentorId", "username email")
+        .populate("menteeId", "username email")
+        .sort({ selectedTime: 1 }),
+      User.find({ mentoringSessionsCount: { $gt: OUTSTANDING_MENTOR_SESSION_THRESHOLD } })
+        .select("-passwordHash")
+        .sort({ mentoringSessionsCount: -1 }),
+    ]);
+
+    const missingFeedback: typeof attendanceConfirmedCandidates = [];
+    for (const meeting of attendanceConfirmedCandidates) {
+      const endTime = await getMeetingEndTime(meeting);
+      if (endTime && endTime.getTime() < oneWeekAgo.getTime()) {
+        missingFeedback.push(meeting);
+      }
+    }
+
+    return res.json({
+      disputes,
+      missingFeedback,
+      outstandingMentors,
+    });
   } catch (error) {
     next(error);
   }

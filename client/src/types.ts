@@ -177,6 +177,35 @@ export const meetingStatusOptions: MeetingStatus[] = [
   "disputed",
 ];
 
+/** Response shape of GET /api/admin/alerts */
+export type AdminAlertUser = {
+  _id: string;
+  username: string;
+  email: string;
+  mentoringSessionsCount?: number;
+  menteeSessionsCount?: number;
+};
+
+export type AdminAlertMeeting = {
+  _id: string;
+  status: MeetingStatus;
+  selectedTime?: string;
+  mentorId: AdminAlertUser;
+  menteeId: AdminAlertUser;
+  attendanceResponses?: {
+    mentor: AttendanceResponseValue | null;
+    mentee: AttendanceResponseValue | null;
+  };
+  updatedAt?: string;
+  createdAt?: string;
+};
+
+export type AdminAlerts = {
+  disputes: AdminAlertMeeting[];
+  missingFeedback: AdminAlertMeeting[];
+  outstandingMentors: User[];
+};
+
 /** Response shape of GET /api/admin/statistics */
 export type AdminStatistics = {
   mentees: {
