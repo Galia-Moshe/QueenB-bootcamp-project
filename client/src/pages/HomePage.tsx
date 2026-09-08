@@ -22,6 +22,7 @@ import EventAvailableIcon from "@mui/icons-material/EventAvailable";
 import EventBusyIcon from "@mui/icons-material/EventBusy";
 import SendIcon from "@mui/icons-material/Send";
 import { api, getApiErrorMessage } from "../api";
+import { useAuth } from "../auth/AuthContext";
 import { HomeCalendar } from "../components/home/HomeCalendar";
 import { HomeMeetingsSidebar } from "../components/home/HomeMeetingsSidebar";
 import { MeetingDetailsModal } from "../components/meetings/MeetingDetailsModal";
@@ -422,6 +423,7 @@ function ScheduledMeetingCard({
 }
 
 export default function HomePage() {
+  const { user } = useAuth();
   const [role, setRole] = useState<MeetingRole>("mentee");
   const [mentorProfile, setMentorProfile] = useState<MentorProfile | null>(null);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
@@ -614,6 +616,7 @@ export default function HomePage() {
         meeting={selectedMeeting}
         open={Boolean(selectedMeeting)}
         onClose={closeMeetingDetails}
+        viewerUserId={user?._id}
       />
     </Stack>
   );

@@ -79,14 +79,21 @@ type MeetingDetailsModalProps = {
   open: boolean;
   onClose: () => void;
   adminMode?: boolean;
+  /** When set, only feedbacks submitted by this user are shown. */
+  viewerUserId?: string;
   onMeetingUpdated?: (meeting: Meeting) => void;
 };
+
+function feedbackFromUserId(fromUserId: User | string) {
+  return typeof fromUserId === "string" ? fromUserId : fromUserId._id;
+}
 
 export function MeetingDetailsModal({
   meeting,
   open,
   onClose,
   adminMode = false,
+  viewerUserId,
   onMeetingUpdated,
 }: MeetingDetailsModalProps) {
   const [selectedStatus, setSelectedStatus] = useState<MeetingStatus | "">("");
@@ -97,6 +104,13 @@ export function MeetingDetailsModal({
     setSelectedStatus(meeting?.status ?? "");
     setStatusError("");
   }, [meeting]);
+
+  const visibleFeedbacks =
+    meeting == null
+      ? []
+      : viewerUserId
+        ? meeting.feedbacks.filter((fb) => feedbackFromUserId(fb.fromUserId) === viewerUserId)
+        : meeting.feedbacks;
 
   const handleSaveStatus = async () => {
     if (!meeting || !selectedStatus || selectedStatus === meeting.status || savingStatus) {
@@ -263,19 +277,19 @@ export function MeetingDetailsModal({
                 </Box>
               )}
 
-            {meeting.status === "feedback_submitted" && (
+            {(meeting.status === "feedback_submitted" || visibleFeedbacks.length > 0) && (
               <Box>
                 <Divider sx={{ mb: 2 }} />
                 <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
-                  משובים
+                  {viewerUserId ? "המשוב שלך" : "משובים"}
                 </Typography>
-                {meeting.feedbacks.length === 0 ? (
+                {visibleFeedbacks.length === 0 ? (
                   <Typography variant="body2" color="text.secondary">
-                    אין משובים להצגה.
+                    {viewerUserId ? "עדיין לא שלחת משוב לפגישה זו." : "אין משובים להצגה."}
                   </Typography>
                 ) : (
                   <Stack spacing={1.5}>
-                    {meeting.feedbacks.map((feedback, index) => (
+                    {visibleFeedbacks.map((feedback, index) => (
                       <Paper key={`${feedback.role}-${index}`} variant="outlined" sx={{ p: 1.5, borderRadius: 2 }}>
                         <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.5 }}>
                           {feedbackAuthorName(feedback.fromUserId, feedback.role)}{" "}

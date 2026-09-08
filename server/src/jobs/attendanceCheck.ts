@@ -51,8 +51,8 @@ async function sendMentorPostMeetingNotification(
     recipient: claimed.mentorId,
     type: MENTOR_POST_MEETING_NOTIFICATION_TYPE,
     meetingId: claimed._id,
-    message: `תודה שהשקעת מזמנך לתת ייעוץ ל${menteeName} 💜\nאם תרצי לכתוב סיכום לפגישה הזו, לחצי כאן.`,
-    actionUrl: `/profile?role=mentor&summaryMeetingId=${String(claimed._id)}`,
+    message: `תודה שהשקעת מזמנך לתת ייעוץ ל${menteeName} 💜`,
+    actionUrl: `/profile?role=mentor`,
     actionStatus: "pending",
   });
 

@@ -27,13 +27,14 @@ const ACTIVE_MEETING_WITH_MENTOR_ERROR = {
   message: "You already have an active meeting scheduled with this mentor.",
 } as const;
 
-const MENTOR_HISTORY_STATUSES = [
+const MEETING_HISTORY_STATUSES = [
   "scheduled",
   "attendance_confirmed",
   "completed",
   "feedback_submitted",
   "disputed",
 ] as const;
+const MEETING_HISTORY_ROLES = ["mentor", "mentee"] as const;
 const MEETING_SUMMARY_MAX_LENGTH = 5000;
 
 function isSameId(first: unknown, second: unknown) {
@@ -84,18 +85,35 @@ function normalizeSearch(value: string) {
   return value.trim().toLocaleLowerCase("he-IL");
 }
 
-function isMentorHistoryStatus(status: MeetingDocument["status"]) {
-  return MENTOR_HISTORY_STATUSES.includes(status as (typeof MENTOR_HISTORY_STATUSES)[number]);
+function isMeetingHistoryStatus(status: MeetingDocument["status"]) {
+  return MEETING_HISTORY_STATUSES.includes(status as (typeof MEETING_HISTORY_STATUSES)[number]);
 }
 
-async function populateMentorHistoryMeeting(meeting: HydratedDocument<MeetingDocument>) {
+function parseMeetingHistoryRole(value: unknown): "mentor" | "mentee" | null {
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  if (typeof rawValue !== "string") {
+    return null;
+  }
+
+  return MEETING_HISTORY_ROLES.includes(rawValue as (typeof MEETING_HISTORY_ROLES)[number])
+    ? (rawValue as "mentor" | "mentee")
+    : null;
+}
+
+async function populateHistoryMeeting(meeting: HydratedDocument<MeetingDocument>) {
   await meeting.populate([
     { path: "mentorId", select: "-passwordHash" },
     { path: "menteeId", select: "-passwordHash" },
     { path: "availabilityWindowId" },
+    { path: "feedbacks.fromUserId", select: "-passwordHash" },
   ]);
 
   return meeting;
+}
+
+/** @deprecated Prefer populateHistoryMeeting — kept for summary endpoints. */
+async function populateMentorHistoryMeeting(meeting: HydratedDocument<MeetingDocument>) {
+  return populateHistoryMeeting(meeting);
 }
 
 async function findMentorSummaryMeeting(
@@ -120,7 +138,7 @@ async function findMentorSummaryMeeting(
     return { ok: false, status: 403, error: "אין לך הרשאה לצפות בסיכום הפגישה הזו" };
   }
 
-  if (!isMentorHistoryStatus(meeting.status) || !(await hasMeetingEnded(meeting, now))) {
+  if (!isMeetingHistoryStatus(meeting.status) || !(await hasMeetingEnded(meeting, now))) {
     return {
       ok: false,
       status: 409,
@@ -128,7 +146,7 @@ async function findMentorSummaryMeeting(
     };
   }
 
-  return { ok: true, meeting: await populateMentorHistoryMeeting(meeting) };
+  return { ok: true, meeting: await populateHistoryMeeting(meeting) };
 }
 
 /** Both sides confirmed attendance (status and/or attendanceResponses). */
@@ -476,46 +494,93 @@ router.get("/my", requireAuth, async (req: AuthRequest, res, next) => {
   }
 });
 
-router.get("/mentor-history", requireAuth, async (req: AuthRequest, res, next) => {
+async function loadMeetingHistory(
+  userId: unknown,
+  role: "mentor" | "mentee",
+  options: { search?: string; limit?: number } = {}
+) {
+  const now = new Date();
+  const search = options.search ? normalizeSearch(options.search) : "";
+
+  const candidates = (await Meeting.find({
+    [role === "mentor" ? "mentorId" : "menteeId"]: userId,
+    status: { $in: [...MEETING_HISTORY_STATUSES] },
+    selectedTime: { $exists: true, $lte: now },
+  })
+    .populate("mentorId", "-passwordHash")
+    .populate("menteeId", "-passwordHash")
+    .populate("availabilityWindowId")
+    .populate("feedbacks.fromUserId", "-passwordHash")
+    .sort({ selectedTime: -1, updatedAt: -1 })) as HydratedDocument<MeetingDocument>[];
+
+  const completedMeetings: HydratedDocument<MeetingDocument>[] = [];
+
+  for (const meeting of candidates) {
+    if (!(await hasMeetingEnded(meeting, now))) {
+      continue;
+    }
+
+    const counterparty = role === "mentor" ? meeting.menteeId : meeting.mentorId;
+    if (search && !normalizeSearch(userNameOf(counterparty)).includes(search)) {
+      continue;
+    }
+
+    completedMeetings.push(meeting);
+  }
+
+  const meetings =
+    typeof options.limit === "number" ? completedMeetings.slice(0, options.limit) : completedMeetings;
+
+  const viewerId = String(userId);
+
+  return {
+    meetings: meetings.map((meeting) => {
+      const object = meeting.toObject();
+      return {
+        ...object,
+        feedbacks: (object.feedbacks || []).filter((feedback) => {
+          const fromId =
+            feedback.fromUserId &&
+            typeof feedback.fromUserId === "object" &&
+            "_id" in feedback.fromUserId
+              ? String((feedback.fromUserId as { _id: unknown })._id)
+              : String(feedback.fromUserId);
+          return fromId === viewerId;
+        }),
+      };
+    }),
+    total: completedMeetings.length,
+    hasMore: typeof options.limit === "number" ? completedMeetings.length > options.limit : false,
+  };
+}
+
+router.get("/history", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const now = new Date();
+    const role = parseMeetingHistoryRole(req.query.role);
+    if (!role) {
+      return res.status(400).json({ error: "יש לציין role=mentor או role=mentee" });
+    }
+
     const search =
       typeof req.query.search === "string" ? normalizeSearch(req.query.search) : "";
     const limit = parseHistoryLimit(req.query.limit);
+    const history = await loadMeetingHistory(req.user!._id, role, { search, limit });
 
-    const candidates = (await Meeting.find({
-      mentorId: req.user!._id,
-      status: { $in: [...MENTOR_HISTORY_STATUSES] },
-      selectedTime: { $exists: true, $lte: now },
-    })
-      .select("+mentorSummary")
-      .populate("mentorId", "-passwordHash")
-      .populate("menteeId", "-passwordHash")
-      .populate("availabilityWindowId")
-      .sort({ selectedTime: -1, updatedAt: -1 })) as HydratedDocument<MeetingDocument>[];
+    return res.json(history);
+  } catch (error) {
+    next(error);
+  }
+});
 
-    const completedMeetings: HydratedDocument<MeetingDocument>[] = [];
+/** @deprecated Use GET /meetings/history?role=mentor */
+router.get("/mentor-history", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const search =
+      typeof req.query.search === "string" ? normalizeSearch(req.query.search) : "";
+    const limit = parseHistoryLimit(req.query.limit);
+    const history = await loadMeetingHistory(req.user!._id, "mentor", { search, limit });
 
-    for (const meeting of candidates) {
-      if (!(await hasMeetingEnded(meeting, now))) {
-        continue;
-      }
-
-      if (search && !normalizeSearch(userNameOf(meeting.menteeId)).includes(search)) {
-        continue;
-      }
-
-      completedMeetings.push(meeting);
-    }
-
-    const meetings =
-      typeof limit === "number" ? completedMeetings.slice(0, limit) : completedMeetings;
-
-    return res.json({
-      meetings: meetings.map((meeting) => meeting.toObject()),
-      total: completedMeetings.length,
-      hasMore: typeof limit === "number" ? completedMeetings.length > limit : false,
-    });
+    return res.json(history);
   } catch (error) {
     next(error);
   }
