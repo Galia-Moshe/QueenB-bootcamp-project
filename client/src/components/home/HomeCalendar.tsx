@@ -42,12 +42,13 @@ export function HomeCalendar({ selectedDate, datesWithEvents, onSelectDate }: Ho
           <Box
             aria-hidden
             sx={{
-              width: 8,
-              height: 8,
+              width: 14,
+              height: 14,
               borderRadius: "50%",
               bgcolor: "#ec407a",
+              boxShadow: "0 0 0 2px rgba(236, 64, 122, 0.25)",
               mt: "auto",
-              mb: 0.75,
+              mb: 1,
               flexShrink: 0,
             }}
           />
