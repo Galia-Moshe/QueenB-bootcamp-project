@@ -129,7 +129,7 @@ function PendingMeetingCard({
 
     try {
       await api.patch(`/meetings/${meeting._id}/reject`);
-      onChanged("הבקשה נדחתה והמועד פתוח שוב לקביעה", "success");
+      onChanged("הבקשה נדחתה והמועד הוסר מהיומן", "success");
     } catch (err) {
       if (axios.isAxiosError(err) && err.response?.status === 409) {
         onChanged("הבקשה הזו כבר טופלה. הרשימה עודכנה.", "error");

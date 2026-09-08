@@ -14,6 +14,9 @@ export const notificationTypes = [
   "new_mentor_request",
   "mentor_approved",
   "mentor_rejected",
+  "additional_availability_request",
+  "additional_availability_added",
+  "additional_availability_unavailable",
 ] as const;
 
 export const notificationActionStatuses = ["pending", "awaiting_other", "feedback_choice", "answered"] as const;
@@ -30,6 +33,11 @@ export type NotificationDocument = {
   meetingId?: Types.ObjectId;
   actionStatus?: NotificationActionStatus;
   actionUrl?: string;
+  /** Who triggered this notification about/for the recipient (e.g. the mentee who asked
+   * a mentor for additional availability). Not every notification type sets this. */
+  fromUserId?: Types.ObjectId;
+  createdAt?: Date;
+  updatedAt?: Date;
 };
 
 const notificationSchema = new Schema<NotificationDocument>(
@@ -63,6 +71,10 @@ const notificationSchema = new Schema<NotificationDocument>(
     },
     actionUrl: {
       type: String,
+    },
+    fromUserId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
   },
   {
