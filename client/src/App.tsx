@@ -8,6 +8,7 @@ import AuthPage from "./pages/AuthPage";
 import HomePage from "./pages/HomePage";
 import MentorProfilePage from "./pages/MentorProfilePage";
 import MentorsPage from "./pages/MentorsPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
 import ScheduleMentorPage from "./pages/ScheduleMentorPage";
 import UserProfilePage from "./pages/UserProfilePage";
@@ -35,6 +36,7 @@ function ProtectedApp() {
         <Route path="/mentors" element={<MentorsPage />} />
         <Route path="/schedule/:mentorId" element={<ScheduleMentorPage />} />
         <Route path="/mentor-profile" element={<MentorProfilePage />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/users/:userId" element={<UserProfilePage />} />
         <Route
