@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import type { PipelineStage } from "mongoose";
+import type { AuthRequest } from "../middleware/auth";
+import { MenteeProfile } from "../models/MenteeProfile";
 import { MentorProfile } from "../models/MentorProfile";
 
 const ACTIVE_MEETING_STATUSES = [
@@ -58,11 +60,12 @@ function todayIsoDate() {
 }
 
 /**
- * Lists mentors via aggregation: MentorProfile → User lookup → filters → pagination.
- * Designed so recommendation scoring stages can be inserted before $facet later.
+ * Lists mentors via aggregation: MentorProfile → User lookup → filters →
+ * mentee topic match scoring → sort by matchScore → pagination.
  */
 export async function listMentors(req: Request, res: Response, next: NextFunction) {
   try {
+    const authReq = req as AuthRequest;
     const {
       search,
       jobTitle,
@@ -82,6 +85,15 @@ export async function listMentors(req: Request, res: Response, next: NextFunctio
     const minExperience = parseOptionalNumber(minYears);
     const maxExperience = parseOptionalNumber(maxYears);
     const availabilityOnly = availability === "true" || availability === "1";
+
+    // Prefer User.desiredTopics; fall back to MenteeProfile.helpTopics for existing mentees.
+    let menteeDesiredTopics = (authReq.user?.desiredTopics ?? []).filter(Boolean);
+    if (menteeDesiredTopics.length === 0 && authReq.user?._id) {
+      const menteeProfile = await MenteeProfile.findOne({ userId: authReq.user._id })
+        .select("helpTopics")
+        .lean();
+      menteeDesiredTopics = (menteeProfile?.helpTopics ?? []).filter(Boolean);
+    }
 
     const matchStage: Record<string, unknown> = {};
 
@@ -202,8 +214,22 @@ export async function listMentors(req: Request, res: Response, next: NextFunctio
       pipeline.push({ $match: matchStage });
     }
 
+    // Score each mentor by overlap between mentee interests and mentor topics.
     pipeline.push(
-      { $sort: { updatedAt: -1 as const } },
+      {
+        $addFields: {
+          matchedTopics: {
+            $setIntersection: [{ $ifNull: ["$topics", []] }, menteeDesiredTopics],
+          },
+        },
+      },
+      {
+        $addFields: {
+          matchScore: { $size: "$matchedTopics" },
+        },
+      },
+      // Highest overlap first; stable secondary sort by mentor name.
+      { $sort: { matchScore: -1 as const, "user.username": 1 as const } },
       {
         $facet: {
           data: [
@@ -219,6 +245,8 @@ export async function listMentors(req: Request, res: Response, next: NextFunctio
                 createdAt: 1,
                 updatedAt: 1,
                 hasAvailability: 1,
+                matchScore: 1,
+                matchedTopics: 1,
                 // Keep populate-compatible shape for the client MentorCard.
                 userId: {
                   _id: "$user._id",
