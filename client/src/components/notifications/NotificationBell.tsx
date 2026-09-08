@@ -269,6 +269,34 @@ export default function NotificationBell() {
     navigate(notification.actionUrl || "/profile?availability=1");
   };
 
+  const handleGoToAvailabilityManagement = (notification: NotificationItem) => {
+    markAsRead(notification);
+    handleClose();
+    navigate("/profile?availability=1");
+  };
+
+  const handleAdditionalAvailabilityResponse = async (
+    notification: NotificationItem,
+    response: "added" | "cannot_add"
+  ) => {
+    if (actingId) return;
+
+    setActingId(notification._id);
+    setActionError("");
+
+    try {
+      await api.patch(`/notifications/${notification._id}/additional-availability-response`, {
+        response,
+      });
+      updateNotificationStatus(notification, "answered");
+    } catch (err) {
+      setActionError(getApiErrorMessage(err));
+      fetchNotifications();
+    } finally {
+      setActingId(null);
+    }
+  };
+
   const closeAvailabilityPrompt = (showFollowUp = true) => {
     if (showFollowUp && availabilityPrompt?.followUpMessage) {
       setToast(availabilityPrompt.followUpMessage);
@@ -422,13 +450,18 @@ export default function NotificationBell() {
                     notification.type === "availability_reminder" &&
                     notification.actionStatus !== "answered";
 
+                  const showAdditionalAvailabilityRequest =
+                    notification.type === "additional_availability_request" &&
+                    notification.actionStatus === "pending";
+
                   const hasInteractiveActions =
                     showAttendanceActions ||
                     showFeedbackChoice ||
                     showFeedbackReminderAction ||
                     showRescheduleInquiry ||
                     showRescheduleReady ||
-                    showAvailabilityReminder;
+                    showAvailabilityReminder ||
+                    showAdditionalAvailabilityRequest;
 
                   return (
                     <Box
@@ -605,6 +638,44 @@ export default function NotificationBell() {
                             }}
                           >
                             להוספת זמנים
+                          </Button>
+                        </Stack>
+                      )}
+
+                      {showAdditionalAvailabilityRequest && (
+                        <Stack direction="row" spacing={1} sx={{ mt: 1.25 }} useFlexGap flexWrap="wrap">
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleGoToAvailabilityManagement(notification);
+                            }}
+                          >
+                            מעבר לניהול זמינות
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="contained"
+                            disabled={actingId === notification._id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleAdditionalAvailabilityResponse(notification, "added");
+                            }}
+                          >
+                            הוספתי זמנים נוספים
+                          </Button>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            color="inherit"
+                            disabled={actingId === notification._id}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleAdditionalAvailabilityResponse(notification, "cannot_add");
+                            }}
+                          >
+                            לא אוכל להוסיף זמנים
                           </Button>
                         </Stack>
                       )}
