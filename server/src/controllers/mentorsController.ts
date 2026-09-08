@@ -10,7 +10,7 @@ const ACTIVE_MEETING_STATUSES = [
 ] as const;
 
 const DEFAULT_PAGE = 1;
-const DEFAULT_LIMIT = 12;
+const DEFAULT_LIMIT = 9;
 const MAX_LIMIT = 50;
 
 type MentorsQuery = {
