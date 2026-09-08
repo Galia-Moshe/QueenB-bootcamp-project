@@ -111,9 +111,9 @@ export function startAttendanceCheckJob() {
 }
 
 /**
- * Every 15 minutes: find attendance-confirmed meetings whose feedback reminder
- * is due, notify participants who have not submitted feedback yet, and clear
- * feedbackReminderAt to prevent repeat sends.
+ * Every 15 minutes: find attendance-confirmed / feedback_submitted meetings
+ * whose feedback reminder is due, notify participants who still owe feedback,
+ * and reschedule feedbackReminderAt +48h until both have submitted.
  */
 export function startFeedbackReminderJob() {
   cron.schedule("*/15 * * * *", async () => {
@@ -125,7 +125,10 @@ export function startFeedbackReminderJob() {
         feedbackReminderAt: { $exists: true, $lte: now },
       });
 
+      let notifiedCount = 0;
+
       for (const meeting of meetings) {
+        // Claim this due reminder so concurrent cron ticks don't double-send.
         const claimed = await Meeting.findOneAndUpdate(
           {
             _id: meeting._id,
@@ -140,11 +143,6 @@ export function startFeedbackReminderJob() {
           continue;
         }
 
-        const when = claimed.selectedTime
-          ? formatMeetingDateTime(claimed.selectedTime)
-          : "הפגישה";
-        const message = `תזכורת: נשמח לשמוע איך היה! אפשר למלא משוב על הפגישה מ-${when}`;
-
         const recipients = [claimed.mentorId, claimed.menteeId].filter((userId) => {
           return !claimed.feedbacks.some(
             (feedback) => String(feedback.fromUserId) === String(userId)
@@ -152,8 +150,14 @@ export function startFeedbackReminderJob() {
         });
 
         if (recipients.length === 0) {
+          // Both submitted — leave feedbackReminderAt cleared.
           continue;
         }
+
+        const when = claimed.selectedTime
+          ? formatMeetingDateTime(claimed.selectedTime)
+          : "הפגישה";
+        const message = `תזכורת: נשמח לשמוע איך היה! אפשר למלא משוב על הפגישה מ-${when}`;
 
         await Notification.create(
           recipients.map((recipient) => ({
@@ -164,10 +168,17 @@ export function startFeedbackReminderJob() {
             actionStatus: "pending" as const,
           }))
         );
+
+        await Meeting.updateOne(
+          { _id: claimed._id },
+          { $set: { feedbackReminderAt: new Date(Date.now() + 48 * 60 * 60 * 1000) } }
+        );
+
+        notifiedCount += 1;
       }
 
-      if (meetings.length > 0) {
-        console.log(`Feedback reminder: notified for ${meetings.length} meeting(s)`);
+      if (notifiedCount > 0) {
+        console.log(`Feedback reminder: notified for ${notifiedCount} meeting(s)`);
       }
     } catch (error) {
       console.error("Feedback reminder job failed", error);
