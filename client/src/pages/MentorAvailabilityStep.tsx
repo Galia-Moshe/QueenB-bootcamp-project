@@ -112,8 +112,9 @@ export default function MentorAvailabilityStep({
         allDay: true,
         display: "block" as const,
         title: list.length === 1 ? "חלון זמין אחד" : `${list.length} חלונות זמינים`,
-        backgroundColor: "#d81b60",
+        backgroundColor: "#FF7EA5",
         borderColor: "transparent",
+        textColor: "#3D2C2E",
       })),
     [windowsByDate]
   );
@@ -255,7 +256,7 @@ export default function MentorAvailabilityStep({
               transition: "background-color 0.15s ease",
             },
             "& .fc-daygrid-day-frame:hover": {
-              backgroundColor: "rgba(236, 64, 122, 0.08)",
+              backgroundColor: "rgba(255, 126, 165, 0.08)",
             },
             "& .fc-event": {
               cursor: "pointer",
@@ -302,9 +303,10 @@ export default function MentorAvailabilityStep({
         maxWidth="xs"
         PaperProps={{
           sx: {
-            border: "1px solid #f8bbd0",
+            border: "1px solid",
+            borderColor: "secondary.main",
             borderRadius: 2,
-            boxShadow: "0 18px 48px rgba(136, 14, 79, 0.16)",
+            boxShadow: "0 18px 48px rgba(255, 126, 165, 0.16)",
           },
         }}
       >

@@ -35,16 +35,17 @@ export default function ViewRoleTabs({
         p: 0.75,
         borderRadius: 999,
         bgcolor: "#ffffff",
-        border: "1px solid #f8bbd0",
-        boxShadow: "0 12px 32px rgba(216, 27, 96, 0.12)",
+        border: "1px solid",
+        borderColor: "secondary.main",
+        boxShadow: "0 12px 32px rgba(255, 126, 165, 0.14)",
         "& .MuiTabs-flexContainer": {
           gap: 0.75,
         },
         "& .MuiTabs-indicator": {
           height: "100%",
           borderRadius: 999,
-          background: "linear-gradient(135deg, #d81b60 0%, #8e24aa 100%)",
-          boxShadow: "0 8px 20px rgba(216, 27, 96, 0.28)",
+          background: "linear-gradient(135deg, #FF7EA5 0%, #E5688F 100%)",
+          boxShadow: "0 8px 20px rgba(255, 126, 165, 0.28)",
         },
         "& .MuiTab-root": {
           position: "relative",
@@ -56,17 +57,17 @@ export default function ViewRoleTabs({
           fontSize: { xs: 13, sm: 16 },
           lineHeight: 1.2,
           whiteSpace: { xs: "normal", sm: "nowrap" },
-          color: "primary.dark",
+          color: "text.primary",
           transition: "color 0.2s ease, background-color 0.2s ease",
           "& .MuiTab-iconWrapper": {
             fontSize: { xs: 18, sm: 20 },
             marginInlineEnd: { xs: 4, sm: 8 },
           },
           "&:hover": {
-            bgcolor: "#fff0f5",
+            bgcolor: "background.default",
           },
           "&.Mui-selected": {
-            color: "#ffffff",
+            color: "primary.contrastText",
             "&:hover": {
               bgcolor: "transparent",
             },

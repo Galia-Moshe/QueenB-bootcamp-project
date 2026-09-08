@@ -18,7 +18,7 @@ function getTopicChipSx(selected: boolean) {
     px: 0.5,
     borderWidth: 1,
     fontWeight: selected ? 900 : 800,
-    boxShadow: selected ? "0 10px 22px rgba(216, 27, 96, 0.26)" : "none",
+    boxShadow: selected ? "0 10px 22px rgba(255, 126, 165, 0.28)" : "none",
     "& .MuiChip-label": {
       px: 1.25,
       py: 0.7,
@@ -27,29 +27,29 @@ function getTopicChipSx(selected: boolean) {
     },
     ...(selected
       ? {
-          backgroundColor: "#d81b60",
-          borderColor: "#d81b60",
-          color: "#ffffff",
+          backgroundColor: "primary.main",
+          borderColor: "primary.main",
+          color: "primary.contrastText",
           "&:hover": {
-            backgroundColor: "#ad1457",
-            borderColor: "#ad1457",
-            color: "#ffffff",
-            boxShadow: "0 12px 26px rgba(173, 20, 87, 0.3)",
+            backgroundColor: "primary.dark",
+            borderColor: "primary.dark",
+            color: "primary.contrastText",
+            boxShadow: "0 12px 26px rgba(229, 104, 143, 0.32)",
           },
           "&:focus-visible": {
-            backgroundColor: "#ad1457",
-            borderColor: "#ad1457",
-            color: "#ffffff",
+            backgroundColor: "primary.dark",
+            borderColor: "primary.dark",
+            color: "primary.contrastText",
           },
         }
       : {
           backgroundColor: "#ffffff",
-          borderColor: "#f8bbd0",
-          color: "#ad1457",
+          borderColor: "secondary.main",
+          color: "text.primary",
           "&:hover": {
-            backgroundColor: "#fff0f5",
-            borderColor: "#ec407a",
-            color: "#ad1457",
+            backgroundColor: "background.default",
+            borderColor: "primary.main",
+            color: "text.primary",
           },
         }),
   };

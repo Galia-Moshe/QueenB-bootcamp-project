@@ -4,7 +4,7 @@
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  background: #fff5f8;
+  background: #fff8f6;
   font-family: Assistant, Rubik, Arial, sans-serif;
 }
 
@@ -20,8 +20,8 @@
 .auth-header {
   width: 100%;
   padding-block: 18px;
-  background: linear-gradient(135deg, #ec407a 0%, #ea95b7 100%);
-  box-shadow: 0 10px 26px rgba(236, 64, 122, 0.2);
+  background: linear-gradient(135deg, #ff7ea5 0%, #ffd8c8 100%);
+  box-shadow: 0 10px 26px rgba(255, 126, 165, 0.22);
 }
 
 .auth-page .auth-header-content {
@@ -32,7 +32,7 @@
 }
 
 .auth-page .auth-header-title {
-  color: #ffffff;
+  color: #3d2c2e;
   font-weight: 900;
   letter-spacing: 0;
   text-align: center;
@@ -43,10 +43,10 @@
   height: 52px;
   display: grid;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.42);
+  border: 1px solid rgba(61, 44, 46, 0.18);
   border-radius: 8px;
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.18);
+  color: #3d2c2e;
+  background: rgba(61, 44, 46, 0.08);
   font-size: 2rem;
   line-height: 1;
 }
@@ -71,18 +71,18 @@
   gap: 32px;
   padding: 40px;
   border-radius: 8px;
-  color: #ffffff;
-  background: linear-gradient(135deg, #ec407a 0%, #ea95b7 100%);
-  box-shadow: 0 18px 48px rgba(236, 64, 122, 0.22);
+  color: #3d2c2e;
+  background: linear-gradient(135deg, #ff7ea5 0%, #ffd8c8 100%);
+  box-shadow: 0 18px 48px rgba(255, 126, 165, 0.22);
 }
 
 .auth-page .auth-illustration-frame {
   width: min(100%, 300px);
   align-self: center;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.38);
+  border: 1px solid rgba(61, 44, 46, 0.16);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .auth-page .auth-illustration {
@@ -92,13 +92,13 @@
 }
 
 .auth-page .auth-eyebrow {
-  color: #fff8fb;
+  color: rgba(61, 44, 46, 0.78);
   font-weight: 800;
   letter-spacing: 0;
 }
 
 .auth-page .auth-title {
-  color: #ffffff;
+  color: #3d2c2e;
   font-size: 2.85rem;
   font-weight: 900;
   line-height: 1.15;
@@ -107,7 +107,7 @@
 .auth-page .auth-description {
   max-width: 680px;
   margin-top: 16px;
-  color: rgba(255, 255, 255, 0.95);
+  color: rgba(61, 44, 46, 0.82);
   font-weight: 500;
   line-height: 1.75;
 }
@@ -122,9 +122,9 @@
   align-items: start;
   gap: 16px;
   padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(61, 44, 46, 0.14);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.28);
 }
 
 .auth-page .auth-feature-icon {
@@ -133,27 +133,27 @@
   display: grid;
   place-items: center;
   border-radius: 8px;
-  color: #c2185b;
+  color: #3d2c2e;
   background: #ffffff;
 }
 
 .auth-page .auth-feature-title {
-  color: #ffffff;
+  color: #3d2c2e;
   font-weight: 800;
 }
 
 .auth-page .auth-feature-description {
   margin-top: 4px;
-  color: rgba(255, 255, 255, 0.9);
+  color: rgba(61, 44, 46, 0.78);
   line-height: 1.7;
 }
 
 .auth-page .auth-card {
   padding: 32px;
   border-radius: 8px;
-  border: 1px solid #f8bbd0;
+  border: 1px solid #ffd8c8;
   background: #ffffff;
-  box-shadow: 0 18px 48px rgba(136, 14, 79, 0.12);
+  box-shadow: 0 18px 48px rgba(255, 126, 165, 0.12);
 }
 
 .auth-page .auth-card-content {
@@ -161,7 +161,7 @@
 }
 
 .auth-page .auth-card-title {
-  color: #ad1457;
+  color: #3d2c2e;
   font-weight: 800;
 }
 
@@ -170,7 +170,7 @@
 }
 
 .auth-page .auth-tabs .MuiTabs-indicator {
-  background-color: #d81b60;
+  background-color: #ff7ea5;
 }
 
 .auth-page .auth-tabs .MuiTab-root {
@@ -179,7 +179,7 @@
 }
 
 .auth-page .auth-tabs .Mui-selected {
-  color: #d81b60;
+  color: #e5688f;
 }
 
 .auth-page .auth-form-fields {
@@ -187,41 +187,43 @@
 }
 
 .auth-page .MuiOutlinedInput-root {
-  background: #fff7fa;
+  background: #fff8f6;
 }
 
 .auth-page .MuiOutlinedInput-root .MuiOutlinedInput-notchedOutline {
-  border-color: #f8bbd0;
+  border-color: #ffd8c8;
 }
 
 .auth-page .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
-  border-color: #ec407a;
+  border-color: #ff7ea5;
 }
 
 .auth-page .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
-  border-color: #d81b60;
+  border-color: #ff7ea5;
 }
 
 .auth-page .MuiInputLabel-root {
-  color: #ad1457;
+  color: #3d2c2e;
 }
 
 .auth-page .MuiInputLabel-root.Mui-focused {
-  color: #d81b60;
+  color: #e5688f;
 }
 
 .auth-page .MuiFormHelperText-root {
-  color: #ad1457;
+  color: #3d2c2e;
 }
 
 .auth-page .auth-card .auth-submit-button.MuiButton-root {
   padding-block: 10px;
-  background: #d81b60;
+  background: #ff7ea5;
+  color: #3d2c2e;
   font-weight: 800;
 }
 
 .auth-page .auth-card .auth-submit-button.MuiButton-root:hover {
-  background: #ad1457;
+  background: #e5688f;
+  color: #3d2c2e;
 }
 
 @media (max-width: 899px) {

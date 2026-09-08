@@ -144,8 +144,9 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
         allDay: true,
         display: "block" as const,
         title: list.length === 1 ? "מועד זמין אחד" : `${list.length} מועדים זמינים`,
-        backgroundColor: "#d81b60",
+        backgroundColor: "#FF7EA5",
         borderColor: "transparent",
+        textColor: "#3D2C2E",
       })),
     [windowsByDate]
   );
@@ -274,9 +275,10 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
       maxWidth="sm"
       PaperProps={{
         sx: {
-          border: "1px solid #f8bbd0",
+          border: "1px solid",
+          borderColor: "secondary.main",
           borderRadius: 2,
-          boxShadow: "0 18px 48px rgba(136, 14, 79, 0.16)",
+          boxShadow: "0 18px 48px rgba(255, 126, 165, 0.16)",
         },
       }}
     >
@@ -311,7 +313,7 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
                     transition: "background-color 0.15s ease",
                   },
                   "& .fc-daygrid-day-frame:hover": {
-                    backgroundColor: "rgba(236, 64, 122, 0.08)",
+                    backgroundColor: "rgba(255, 126, 165, 0.08)",
                   },
                   "& .fc-event": {
                     cursor: "pointer",
@@ -323,8 +325,8 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
                     backgroundColor: "transparent",
                   },
                   "& .fc-day-selected .fc-daygrid-day-frame": {
-                    backgroundColor: "rgba(216, 27, 96, 0.16)",
-                    boxShadow: "inset 0 0 0 2px #d81b60",
+                    backgroundColor: "rgba(255, 126, 165, 0.18)",
+                    boxShadow: "inset 0 0 0 2px #FF7EA5",
                   },
                 }}
               >

@@ -185,7 +185,7 @@ export const statusLabels: Record<MeetingStatus, string> = {
 /** Calendar / chip colors keyed by meeting status */
 export const statusColors: Record<MeetingStatus, string> = {
   pending_mentor_times: "#B26A00",
-  pending_mentee_selection: "#C85C8E",
+  pending_mentee_selection: "#E5688F",
   scheduled: "#146C94",
   attendance_confirmed: "#2E7D62",
   completed: "#5B8C5A",

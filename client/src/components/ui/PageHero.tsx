@@ -21,9 +21,9 @@ export default function PageHero({ title, description, action, sx }: PageHeroPro
         {
           p: { xs: 2.5, md: 3 },
           borderRadius: 2,
-          color: "#ffffff",
-          background: "linear-gradient(135deg, #ec407a 0%, #ea95b7 100%)",
-          boxShadow: "0 18px 48px rgba(236, 64, 122, 0.18)",
+          color: "text.primary",
+          background: "linear-gradient(135deg, #FF7EA5 0%, #FFD8C8 100%)",
+          boxShadow: "0 18px 48px rgba(255, 126, 165, 0.2)",
           ...(action
             ? {
                 display: "flex",
@@ -34,17 +34,17 @@ export default function PageHero({ title, description, action, sx }: PageHeroPro
               }
             : {}),
           "& .MuiTypography-root": {
-            color: "#ffffff",
+            color: "text.primary",
           },
           "& .MuiTypography-root + .MuiTypography-root": {
-            color: "rgba(255, 255, 255, 0.92)",
+            color: "text.secondary",
           },
         },
         ...toSxArray(sx),
       ]}
     >
       <Box>
-        <Typography variant="h4" sx={{ color: "#ffffff", fontWeight: 900 }}>
+        <Typography variant="h4" sx={{ color: "text.primary", fontWeight: 900 }}>
           {title}
         </Typography>
         {description && <Typography color="text.secondary">{description}</Typography>}

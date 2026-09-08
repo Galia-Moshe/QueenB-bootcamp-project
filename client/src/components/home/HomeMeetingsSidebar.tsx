@@ -104,9 +104,10 @@ export function HomeMeetingsSidebar({
                         display: "block",
                         width: "100%",
                         textAlign: "start",
-                        border: "1px solid #f8bbd0",
+                        border: "1px solid",
+                        borderColor: "secondary.main",
                         borderRadius: 2,
-                        bgcolor: "#fff7fa",
+                        bgcolor: "background.default",
                         px: 1.75,
                         py: 1.5,
                         cursor: "pointer",
@@ -114,8 +115,8 @@ export function HomeMeetingsSidebar({
                         font: "inherit",
                         color: "inherit",
                         "&:hover": {
-                          backgroundColor: "rgba(236, 64, 122, 0.1)",
-                          boxShadow: "0 8px 20px rgba(136, 14, 79, 0.08)",
+                          backgroundColor: "rgba(255, 126, 165, 0.12)",
+                          boxShadow: "0 8px 20px rgba(255, 126, 165, 0.12)",
                         },
                       }}
                     >

@@ -45,8 +45,8 @@ export function HomeCalendar({ selectedDate, datesWithEvents, onSelectDate }: Ho
               width: 14,
               height: 14,
               borderRadius: "50%",
-              bgcolor: "#ec407a",
-              boxShadow: "0 0 0 2px rgba(236, 64, 122, 0.25)",
+              bgcolor: "primary.main",
+              boxShadow: "0 0 0 2px rgba(255, 126, 165, 0.28)",
               mt: "auto",
               mb: 1,
               flexShrink: 0,
@@ -67,14 +67,14 @@ export function HomeCalendar({ selectedDate, datesWithEvents, onSelectDate }: Ho
           minHeight: 72,
         },
         "& .fc-daygrid-day-frame:hover": {
-          backgroundColor: "rgba(236, 64, 122, 0.08)",
+          backgroundColor: "rgba(255, 126, 165, 0.08)",
         },
         "& .fc-daygrid-day-events": {
           display: "none",
         },
         "& .fc-day-selected .fc-daygrid-day-frame": {
-          backgroundColor: "rgba(216, 27, 96, 0.16)",
-          boxShadow: "inset 0 0 0 2px #d81b60",
+          backgroundColor: "rgba(255, 126, 165, 0.18)",
+          boxShadow: "inset 0 0 0 2px #FF7EA5",
         },
       }}
     >

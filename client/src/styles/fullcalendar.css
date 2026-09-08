@@ -8,15 +8,16 @@
 }
 
 .fc .fc-toolbar-title {
-  color: #ad1457;
+  color: #3d2c2e;
   font-weight: 900;
   letter-spacing: 0;
 }
 
 .fc .fc-button {
   border-radius: 8px;
-  background: #d81b60;
-  border-color: #d81b60;
+  background: #ff7ea5;
+  border-color: #ff7ea5;
+  color: #3d2c2e;
   box-shadow: none;
   font-family: Assistant, Rubik, Arial, sans-serif;
   font-weight: 800;
@@ -24,26 +25,28 @@
 
 .fc .fc-button:hover,
 .fc .fc-button:focus {
-  background: #ad1457;
-  border-color: #ad1457;
+  background: #e5688f;
+  border-color: #e5688f;
+  color: #3d2c2e;
   box-shadow: none;
 }
 
 .fc .fc-button-primary:not(:disabled).fc-button-active,
 .fc .fc-button-primary:not(:disabled):active {
-  background: #ad1457;
-  border-color: #ad1457;
+  background: #e5688f;
+  border-color: #e5688f;
+  color: #3d2c2e;
 }
 
 .fc-theme-standard td,
 .fc-theme-standard th,
 .fc-theme-standard .fc-scrollgrid {
-  border-color: #f8bbd0;
+  border-color: #ffd8c8;
 }
 
 .fc .fc-col-header-cell-cushion,
 .fc .fc-daygrid-day-number {
-  color: #ad1457;
+  color: #3d2c2e;
   font-weight: 800;
 }
 
