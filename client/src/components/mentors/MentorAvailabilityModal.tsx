@@ -71,14 +71,26 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [hasActiveMeetingWithMentor, setHasActiveMeetingWithMentor] = useState(false);
+  const [canRequestMoreAvailability, setCanRequestMoreAvailability] = useState(false);
+  const [blockedByCancellationLimit, setBlockedByCancellationLimit] = useState(false);
+  const [additionalAvailabilityRequestPending, setAdditionalAvailabilityRequestPending] =
+    useState(false);
+  const [requestingMoreAvailability, setRequestingMoreAvailability] = useState(false);
+  const [requestMoreAvailabilityError, setRequestMoreAvailabilityError] = useState("");
 
   const fetchAvailability = useCallback(async () => {
     if (!mentor) return;
 
-    const response = await api.get<{ availabilityWindows: AvailabilityWindow[] }>(
-      `/mentors/${mentor._id}/availability`
-    );
+    const response = await api.get<{
+      availabilityWindows: AvailabilityWindow[];
+      canRequestAdditionalAvailability: boolean;
+      blockedByCancellationLimit: boolean;
+      additionalAvailabilityRequestPending: boolean;
+    }>(`/mentors/${mentor._id}/availability`);
     setWindows(response.data.availabilityWindows);
+    setCanRequestMoreAvailability(response.data.canRequestAdditionalAvailability);
+    setBlockedByCancellationLimit(response.data.blockedByCancellationLimit);
+    setAdditionalAvailabilityRequestPending(response.data.additionalAvailabilityRequestPending);
     return response.data.availabilityWindows;
   }, [mentor]);
 
@@ -106,6 +118,9 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
     setShowTopicStep(false);
     setSelectedTopics([]);
     setHasActiveMeetingWithMentor(false);
+    setBlockedByCancellationLimit(false);
+    setAdditionalAvailabilityRequestPending(false);
+    setRequestMoreAvailabilityError("");
 
     Promise.all([fetchAvailability(), checkExistingActiveMeeting()])
       .catch((err) => setLoadError(getApiErrorMessage(err)))
@@ -223,6 +238,31 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRequestMoreAvailability = async () => {
+    if (!mentor || requestingMoreAvailability) return;
+
+    setRequestingMoreAvailability(true);
+    setRequestMoreAvailabilityError("");
+
+    try {
+      await api.post(`/mentors/${mentor._id}/request-additional-availability`);
+      setCanRequestMoreAvailability(false);
+      setAdditionalAvailabilityRequestPending(true);
+    } catch (err) {
+      if (axios.isAxiosError(err) && err.response?.status === 409) {
+        // Stale UI state (e.g. a request already exists, answered or not) — resync from the
+        // server instead of guessing which alert to show.
+        await fetchAvailability().catch(() => {
+          setCanRequestMoreAvailability(false);
+        });
+      } else {
+        setRequestMoreAvailabilityError(getApiErrorMessage(err));
+      }
+    } finally {
+      setRequestingMoreAvailability(false);
     }
   };
 
@@ -387,6 +427,40 @@ export default function MentorAvailabilityModal({ open, mentor, topics, onClose,
               )}
             </>
           )}
+
+          {!loading &&
+            !loadError &&
+            !hasActiveMeetingWithMentor &&
+            !blockedByCancellationLimit &&
+            (canRequestMoreAvailability || additionalAvailabilityRequestPending) && (
+              <>
+                <Divider />
+                {canRequestMoreAvailability ? (
+                  <Stack spacing={1} sx={{ alignItems: "flex-start" }}>
+                    <Typography variant="body2" color="text.secondary">
+                      אף אחד מהזמנים המוצעים לא מתאים לך?
+                    </Typography>
+                    {requestMoreAvailabilityError && (
+                      <Alert severity="error" sx={{ width: "100%" }}>
+                        {requestMoreAvailabilityError}
+                      </Alert>
+                    )}
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={requestingMoreAvailability}
+                      onClick={handleRequestMoreAvailability}
+                    >
+                      {requestingMoreAvailability ? "שולחת בקשה..." : "בקשת זמנים נוספים"}
+                    </Button>
+                  </Stack>
+                ) : (
+                  <Alert severity="info">
+                    שלחת בקשה לזמנים נוספים למנטורית הזו. נעדכן אותך כשהיא תגיב.
+                  </Alert>
+                )}
+              </>
+            )}
         </Stack>
       </DialogContent>
     </Dialog>

@@ -131,7 +131,10 @@ export type NotificationType =
   | "availability_reminder"
   | "new_mentor_request"
   | "mentor_approved"
-  | "mentor_rejected";
+  | "mentor_rejected"
+  | "additional_availability_request"
+  | "additional_availability_added"
+  | "additional_availability_unavailable";
 
 export type NotificationActionStatus = "pending" | "awaiting_other" | "feedback_choice" | "answered";
 
