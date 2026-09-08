@@ -4,13 +4,45 @@ import { requireAuth, type AuthRequest } from "../middleware/auth";
 
 const router = Router();
 
+const DEFAULT_PAGE = 1;
+const DEFAULT_LIMIT = 20;
+const MAX_LIMIT = 50;
+
+function parsePositiveInt(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    return fallback;
+  }
+  return Math.floor(parsed);
+}
+
 router.get("/", requireAuth, async (req: AuthRequest, res, next) => {
   try {
-    const notifications = await Notification.find({ recipient: req.user!._id }).sort({
-      createdAt: -1,
-    });
+    const recipient = req.user!._id;
+    const page = parsePositiveInt(req.query.page, DEFAULT_PAGE);
+    const limit = Math.min(parsePositiveInt(req.query.limit, DEFAULT_LIMIT), MAX_LIMIT);
+    const skip = (page - 1) * limit;
 
-    return res.json({ notifications });
+    const filter = { recipient };
+
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
+      Notification.countDocuments(filter),
+      Notification.countDocuments({ ...filter, read: false }),
+    ]);
+
+    const totalPages = total === 0 ? 0 : Math.ceil(total / limit);
+
+    return res.json({
+      notifications,
+      unreadCount,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -97,6 +129,15 @@ router.patch("/read-all", requireAuth, async (req: AuthRequest, res, next) => {
     );
 
     return res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.delete("/", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const result = await Notification.deleteMany({ recipient: req.user!._id });
+    return res.json({ success: true, deletedCount: result.deletedCount });
   } catch (error) {
     next(error);
   }

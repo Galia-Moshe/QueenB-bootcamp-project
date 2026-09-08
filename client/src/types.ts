@@ -157,6 +157,19 @@ export type NotificationItem = {
   updatedAt: string;
 };
 
+export type NotificationsPagination = {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+};
+
+export type NotificationsListResponse = {
+  notifications: NotificationItem[];
+  unreadCount: number;
+  pagination: NotificationsPagination;
+};
+
 
 export const statusLabels: Record<MeetingStatus, string> = {
   pending_mentor_times: "ממתינה לאישור",
