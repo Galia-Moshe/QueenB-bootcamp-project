@@ -24,6 +24,11 @@ function toMinutes(time: string) {
   return hours * 60 + minutes;
 }
 
+/** An availability window must start strictly in the future — never earlier today. */
+function isPastDateTime(date: string, startTime: string) {
+  return new Date(`${date}T${startTime}:00`).getTime() <= Date.now();
+}
+
 /**
  * A mentee may request additional availability from a mentor once per "scheduling attempt".
  * There's no dedicated attempt entity — a new attempt is recognized whenever a Meeting between
@@ -197,6 +202,10 @@ router.post("/me/availability", requireAuth, async (req: AuthRequest, res, next)
       return res.status(400).json({ error: "שעת הסיום חייבת להיות אחרי שעת ההתחלה" });
     }
 
+    if (isPastDateTime(date, startTime)) {
+      return res.status(400).json({ error: "לא ניתן ליצור חלון זמינות בשעה שכבר עברה" });
+    }
+
     const availabilityWindow = await AvailabilityWindow.create({
       mentorId: req.user!._id,
       date,
@@ -221,6 +230,10 @@ router.put("/me/availability/:id", requireAuth, async (req: AuthRequest, res, ne
 
     if (toMinutes(endTime) <= toMinutes(startTime)) {
       return res.status(400).json({ error: "שעת הסיום חייבת להיות אחרי שעת ההתחלה" });
+    }
+
+    if (isPastDateTime(date, startTime)) {
+      return res.status(400).json({ error: "לא ניתן להעביר חלון זמינות לשעה שכבר עברה" });
     }
 
     const availabilityWindow = await AvailabilityWindow.findOne({

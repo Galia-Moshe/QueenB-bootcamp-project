@@ -33,6 +33,17 @@ const TIME_OPTIONS = Array.from({ length: 36 }, (_, index) => {
   return `${hours}:${minutes}`;
 });
 
+const PAST_TIME_ERROR = "לא ניתן לבחור שעה שכבר עברה";
+
+function timeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number);
+  return hours * 60 + minutes;
+}
+
+function minutesSinceMidnight(date: Date) {
+  return date.getHours() * 60 + date.getMinutes();
+}
+
 function formatDateKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -109,14 +120,27 @@ export default function MentorAvailabilityStep({
 
   const dayWindows = selectedDate ? windowsByDate.get(selectedDate) || [] : [];
 
-  const tomorrowKey = useMemo(() => {
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    return formatDateKey(tomorrow);
-  }, []);
+  const [now, setNow] = useState(() => new Date());
+
+  // Keep the past-time cutoff fresh while the day dialog is open, so options
+  // that pass during the session become unselectable without a reload.
+  useEffect(() => {
+    if (!selectedDate) return;
+
+    const intervalId = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(intervalId);
+  }, [selectedDate]);
+
+  const todayKey = formatDateKey(now);
+  const isToday = selectedDate === todayKey;
+  const nowMinutes = minutesSinceMidnight(now);
+
+  const isPastTime = (time: string) => isToday && timeToMinutes(time) <= nowMinutes;
+  // The last option can only serve as an end time, so it never seeds a new window.
+  const firstFutureTime = TIME_OPTIONS.slice(0, -1).find((time) => !isPastTime(time));
 
   const openDay = (dateKey: string) => {
-    if (dateKey < tomorrowKey) return;
+    if (dateKey < todayKey) return;
 
     setSelectedDate(dateKey);
     setFormOpen(false);
@@ -132,9 +156,13 @@ export default function MentorAvailabilityStep({
   };
 
   const openAddForm = () => {
+    const defaultStart = !firstFutureTime || firstFutureTime < "10:00" ? "10:00" : firstFutureTime;
+    const startIndex = TIME_OPTIONS.indexOf(defaultStart);
+    const defaultEnd = TIME_OPTIONS[Math.min(startIndex + 4, TIME_OPTIONS.length - 1)];
+
     setEditingId(null);
-    setStartTime("10:00");
-    setEndTime("12:00");
+    setStartTime(defaultStart);
+    setEndTime(defaultEnd);
     setFormError("");
     setFormOpen(true);
   };
@@ -149,6 +177,15 @@ export default function MentorAvailabilityStep({
 
   const handleSubmitWindow = async () => {
     if (!selectedDate) return;
+
+    const submittedAt = new Date();
+    if (
+      selectedDate === formatDateKey(submittedAt) &&
+      timeToMinutes(startTime) <= minutesSinceMidnight(submittedAt)
+    ) {
+      setFormError(PAST_TIME_ERROR);
+      return;
+    }
 
     setSaving(true);
     setFormError("");
@@ -239,7 +276,7 @@ export default function MentorAvailabilityStep({
             locale={heLocale}
             direction="rtl"
             height="auto"
-            validRange={{ start: tomorrowKey }}
+            validRange={{ start: todayKey }}
             events={calendarEvents}
             dateClick={(arg: DateClickArg) => openDay(arg.dateStr)}
             eventClick={(arg: EventClickArg) => openDay(arg.event.startStr)}
@@ -314,10 +351,12 @@ export default function MentorAvailabilityStep({
                   label="משעה"
                   value={startTime}
                   onChange={(event) => setStartTime(event.target.value)}
+                  error={isPastTime(startTime)}
+                  helperText={isPastTime(startTime) ? PAST_TIME_ERROR : ""}
                   fullWidth
                 >
                   {TIME_OPTIONS.map((time) => (
-                    <MenuItem key={time} value={time}>
+                    <MenuItem key={time} value={time} disabled={isPastTime(time)}>
                       {time}
                     </MenuItem>
                   ))}
@@ -331,14 +370,18 @@ export default function MentorAvailabilityStep({
                   fullWidth
                 >
                   {TIME_OPTIONS.map((time) => (
-                    <MenuItem key={time} value={time}>
+                    <MenuItem key={time} value={time} disabled={isPastTime(time)}>
                       {time}
                     </MenuItem>
                   ))}
                 </TextField>
 
                 <Stack direction="row" spacing={1}>
-                  <Button variant="contained" onClick={handleSubmitWindow} disabled={saving}>
+                  <Button
+                    variant="contained"
+                    onClick={handleSubmitWindow}
+                    disabled={saving || isPastTime(startTime)}
+                  >
                     {editingId ? "שמירת שינויים" : "הוסף זמינות"}
                   </Button>
                   <Button onClick={() => setFormOpen(false)} disabled={saving}>
@@ -347,9 +390,18 @@ export default function MentorAvailabilityStep({
                 </Stack>
               </Stack>
             ) : (
-              <Button startIcon={<AddIcon />} onClick={openAddForm}>
-                הוסף חלון זמינות
-              </Button>
+              <Stack spacing={1}>
+                {isToday && !firstFutureTime && (
+                  <Alert severity="info">לא נותרו שעות פנויות להיום</Alert>
+                )}
+                <Button
+                  startIcon={<AddIcon />}
+                  onClick={openAddForm}
+                  disabled={isToday && !firstFutureTime}
+                >
+                  הוסף חלון זמינות
+                </Button>
+              </Stack>
             )}
           </Stack>
         </DialogContent>
