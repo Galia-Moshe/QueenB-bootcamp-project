@@ -14,8 +14,6 @@ import {
   Link as MuiLink,
   Stack,
   TextField,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
@@ -30,6 +28,7 @@ import { useAuth } from "../auth/AuthContext";
 import TopicSelector from "../components/mentor-profile/TopicSelector";
 import MentorAvailabilityStep from "./MentorAvailabilityStep";
 import ProfileMeetingHistory from "../components/profile/ProfileMeetingHistory";
+import ProfileViewTabs from "../components/profile/ProfileViewTabs";
 import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
@@ -213,57 +212,6 @@ function ChipList({ items }: { items: string[] }) {
         <Chip key={item} label={item} size="small" />
       ))}
     </Stack>
-  );
-}
-
-function ProfileRoleSwitcher({
-  value,
-  onChange,
-}: {
-  value: MeetingRole;
-  onChange: (role: MeetingRole) => void;
-}) {
-  return (
-    <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
-      <Stack spacing={1.5}>
-        <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-          תצוגת אזור אישי
-        </Typography>
-        <ToggleButtonGroup
-          dir="rtl"
-          exclusive
-          size="small"
-          value={value}
-          onChange={(_event, nextRole: MeetingRole | null) => {
-            if (nextRole) {
-              onChange(nextRole);
-            }
-          }}
-          sx={{
-            alignSelf: "stretch",
-            "& .MuiToggleButton-root": {
-              flex: 1,
-              minHeight: 36,
-              px: 1.5,
-              borderColor: "#f8bbd0",
-              color: "primary.dark",
-              fontWeight: 800,
-              whiteSpace: "nowrap",
-              "&.Mui-selected": {
-                bgcolor: "primary.main",
-                color: "#ffffff",
-                "&:hover": {
-                  bgcolor: "primary.dark",
-                },
-              },
-            },
-          }}
-        >
-          <ToggleButton value="mentee">בתור מנטית</ToggleButton>
-          <ToggleButton value="mentor">בתור מנטורית</ToggleButton>
-        </ToggleButtonGroup>
-      </Stack>
-    </SurfaceCard>
   );
 }
 
@@ -669,6 +617,10 @@ export default function ProfilePage() {
         description={user?.username ? `${user.username}, הפרטים שלך במקום אחד` : undefined}
       />
 
+      {isMentor && (
+        <ProfileViewTabs value={selectedMeetingRole} onChange={setSelectedMeetingRole} />
+      )}
+
       {loadError && <Alert severity="error">{loadError}</Alert>}
 
       <Box
@@ -685,13 +637,6 @@ export default function ProfilePage() {
       >
         <Box sx={{ gridColumn: { xs: "auto", lg: 2 }, gridRow: { xs: "auto", lg: 1 } }}>
           <Stack spacing={3}>
-            {isMentor && (
-              <ProfileRoleSwitcher
-                value={selectedMeetingRole}
-                onChange={setSelectedMeetingRole}
-              />
-            )}
-
             {isMentor && activeProfileRole === "mentor" && (
               <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
                 <Stack spacing={1.5}>

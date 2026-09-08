@@ -12,9 +12,7 @@ import {
   DialogContentText,
   DialogTitle,
   Divider,
-  FormControlLabel,
   Stack,
-  Switch,
   TextField,
   Typography,
 } from "@mui/material";
@@ -28,6 +26,7 @@ import { HomeMeetingsSidebar } from "../components/home/HomeMeetingsSidebar";
 import { MeetingDetailsModal } from "../components/meetings/MeetingDetailsModal";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
+import ViewRoleTabs from "../components/ui/ViewRoleTabs";
 import { UserProfileLink } from "../components/UserProfileLink";
 import type { AvailabilityWindow, Meeting, MentorProfile, User } from "../types";
 import { statusLabels } from "../types";
@@ -515,27 +514,17 @@ export default function HomePage() {
       <PageHero
         title="היומן שלי"
         description="פגישות שנקבעו מופיעות ביומן, ובקשות שעדיין מחכות לפעולה מופיעות בצד."
-        action={
-          canSwitchRoles && (
-            <FormControlLabel
-              sx={{
-                mx: 0,
-                color: "#ffffff",
-                "& .MuiFormControlLabel-label": {
-                  fontWeight: 800,
-                },
-              }}
-              control={
-                <Switch
-                  checked={role === "mentor"}
-                  onChange={(event) => setRole(event.target.checked ? "mentor" : "mentee")}
-                />
-              }
-              label={role === "mentor" ? "הפגישות שלי כמנטורית" : "הפגישות שלי כמנטית"}
-            />
-          )
-        }
       />
+
+      {canSwitchRoles && (
+        <ViewRoleTabs
+          value={role}
+          onChange={setRole}
+          ariaLabel="תצוגת הפגישות שלי"
+          menteeLabel="הפגישות שלי כמנטית"
+          mentorLabel="הפגישות שלי כמנטורית"
+        />
+      )}
 
       {error && <Alert severity="error">{error}</Alert>}
       {actionMessage && <Alert severity={actionMessage.severity}>{actionMessage.text}</Alert>}
