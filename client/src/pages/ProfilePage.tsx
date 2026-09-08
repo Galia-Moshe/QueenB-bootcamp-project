@@ -28,13 +28,13 @@ import { useSearchParams } from "react-router-dom";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import TopicSelector from "../components/mentor-profile/TopicSelector";
-import MentorMeetingHistory from "../components/profile/MentorMeetingHistory";
+import MentorAvailabilityStep from "./MentorAvailabilityStep";
+import ProfileMeetingHistory from "../components/profile/ProfileMeetingHistory";
 import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import { MENTOR_TOPIC_OPTIONS } from "../constants/mentorTopics";
 import type { MenteeProfile, MentorProfile, User } from "../types";
-import MentorAvailabilityStep from "./MentorAvailabilityStep";
 
 type ProfileResponse = {
   user: User;
@@ -300,8 +300,7 @@ export default function ProfilePage() {
   const isMentor = mentorProfile?.approvalStatus === "approved";
   const activeProfileRole = isMentor ? selectedMeetingRole : "mentee";
   const requestedProfileRole = searchParams.get("role");
-  const requestedSummaryMeetingId = searchParams.get("summaryMeetingId");
-  const hasProfileRouteTarget = requestedProfileRole === "mentor" || Boolean(requestedSummaryMeetingId);
+  const hasProfileRouteTarget = requestedProfileRole === "mentor";
   const avatarSrc = profilePicturePreview || profilePicture || undefined;
 
   const setFormValue = (field: keyof ProfileForm, value: string) => {
@@ -351,7 +350,7 @@ export default function ProfilePage() {
       return;
     }
 
-    const routeQueryKey = `${requestedProfileRole || ""}:${requestedSummaryMeetingId || ""}`;
+    const routeQueryKey = requestedProfileRole || "";
     if (handledProfileRouteQuery === routeQueryKey) {
       return;
     }
@@ -364,7 +363,6 @@ export default function ProfilePage() {
     isMentor,
     loading,
     requestedProfileRole,
-    requestedSummaryMeetingId,
   ]);
 
   const clearSectionMessages = useCallback((section: SectionKey) => {
@@ -678,20 +676,21 @@ export default function ProfilePage() {
           display: "grid",
           gridTemplateColumns: {
             xs: "1fr",
-            lg: isMentor ? "minmax(0, 1040px) 360px" : "minmax(0, 1040px)",
+            lg: "minmax(0, 1040px) 360px",
           },
           gap: 3,
           alignItems: "start",
           justifyContent: "center",
         }}
       >
-        {isMentor && (
         <Box sx={{ gridColumn: { xs: "auto", lg: 2 }, gridRow: { xs: "auto", lg: 1 } }}>
           <Stack spacing={3}>
-            <ProfileRoleSwitcher
-              value={selectedMeetingRole}
-              onChange={setSelectedMeetingRole}
-            />
+            {isMentor && (
+              <ProfileRoleSwitcher
+                value={selectedMeetingRole}
+                onChange={setSelectedMeetingRole}
+              />
+            )}
 
             {isMentor && activeProfileRole === "mentor" && (
               <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
@@ -713,12 +712,9 @@ export default function ProfilePage() {
               </SurfaceCard>
             )}
 
-            {activeProfileRole === "mentor" && (
-              <MentorMeetingHistory targetMeetingId={requestedSummaryMeetingId} />
-            )}
+            <ProfileMeetingHistory role={activeProfileRole} />
           </Stack>
         </Box>
-        )}
 
         <SurfaceCard
           dir="rtl"

@@ -269,18 +269,10 @@ export default function NotificationBell() {
     navigate(notification.actionUrl || "/profile?availability=1");
   };
 
-  const handleMentorSummaryNotificationClick = (notification: NotificationItem) => {
-    const summaryUrl =
-      notification.actionUrl ||
-      (notification.meetingId
-        ? `/profile?role=mentor&summaryMeetingId=${notification.meetingId}`
-        : "");
-
-    if (!summaryUrl) return;
-
+  const handleMentorThankYouNotificationClick = (notification: NotificationItem) => {
     markAsRead(notification);
     handleClose();
-    navigate(summaryUrl);
+    navigate(notification.actionUrl || "/profile?role=mentor");
   };
 
   const handleGoToAvailabilityManagement = (notification: NotificationItem) => {
@@ -487,7 +479,7 @@ export default function NotificationBell() {
                       key={notification._id}
                       onClick={() => {
                         if (showMentorSummaryLink) {
-                          handleMentorSummaryNotificationClick(notification);
+                          handleMentorThankYouNotificationClick(notification);
                         } else if (!hasInteractiveActions) {
                           markAsRead(notification);
                         }
