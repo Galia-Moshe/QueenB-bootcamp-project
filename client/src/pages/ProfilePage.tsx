@@ -1,4 +1,4 @@
-import React, { ChangeEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import React, { ChangeEvent, ReactNode, useCallback, useEffect, useState } from "react";
 import {
   Alert,
   Avatar,
@@ -9,7 +9,6 @@ import {
   Dialog,
   DialogActions,
   DialogContent,
-  DialogContentText,
   DialogTitle,
   Divider,
   Link as MuiLink,
@@ -20,7 +19,6 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
 import CloseIcon from "@mui/icons-material/Close";
 import DeleteIcon from "@mui/icons-material/Delete";
 import EditIcon from "@mui/icons-material/Edit";
@@ -30,13 +28,12 @@ import { useSearchParams } from "react-router-dom";
 import { api, getApiErrorMessage } from "../api";
 import { useAuth } from "../auth/AuthContext";
 import TopicSelector from "../components/mentor-profile/TopicSelector";
+import MentorMeetingHistory from "../components/profile/MentorMeetingHistory";
 import StringListEditor from "../components/profile/StringListEditor";
 import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
-import { UserProfileLink } from "../components/UserProfileLink";
 import { MENTOR_TOPIC_OPTIONS } from "../constants/mentorTopics";
-import type { Meeting, MenteeProfile, MentorProfile, User } from "../types";
-import { statusLabels } from "../types";
+import type { MenteeProfile, MentorProfile, User } from "../types";
 import MentorAvailabilityStep from "./MentorAvailabilityStep";
 
 type ProfileResponse = {
@@ -94,24 +91,9 @@ const EMPTY_FORM: ProfileForm = {
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PROFILE_IMAGE_TYPES = ["image/gif", "image/jpeg", "image/png", "image/webp"];
 const PROFILE_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
-const meetingRoleLabels: Record<MeetingRole, string> = {
-  mentor: "מנטורית",
-  mentee: "מנטית",
-};
 
 function numberToField(value?: number) {
   return value === undefined || value === null ? "" : String(value);
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("he-IL", {
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-function otherParticipant(meeting: Meeting, role: MeetingRole): User {
-  return role === "mentor" ? meeting.menteeId : meeting.mentorId;
 }
 
 function buildForm(
@@ -234,216 +216,52 @@ function ChipList({ items }: { items: string[] }) {
   );
 }
 
-function MeetingCancellationCard({
-  meeting,
-  role,
-  onCanceled,
+function ProfileRoleSwitcher({
+  value,
+  onChange,
 }: {
-  meeting: Meeting;
-  role: MeetingRole;
-  onCanceled: () => void;
+  value: MeetingRole;
+  onChange: (role: MeetingRole) => void;
 }) {
-  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
-  const participant = otherParticipant(meeting, role);
-  const meetingTime = meeting.selectedTime
-    ? `מועד הפגישה: ${formatDateTime(meeting.selectedTime)}`
-    : "מועד הפגישה עדיין לא נקבע";
-
-  const cancelMeeting = async () => {
-    setError("");
-    setSubmitting(true);
-
-    try {
-      await api.patch(`/meetings/${meeting._id}/decline`);
-      setCancelDialogOpen(false);
-      onCanceled();
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
-  return (
-    <>
-      <SurfaceCard dir="rtl" variant="outlined" muted shadow={false} sx={{ textAlign: "start" }}>
-        <Stack spacing={1.25} sx={{ alignItems: "stretch" }}>
-          <Stack direction="column" spacing={1} alignItems="stretch">
-            <Box sx={{ width: "100%", textAlign: "start" }}>
-              <Typography sx={{ color: "primary.dark", fontWeight: 800, textAlign: "start" }}>
-                <UserProfileLink userId={participant._id} userName={participant.username} />
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ textAlign: "start" }}>
-                {meetingTime}
-              </Typography>
-            </Box>
-
-            <Stack
-              direction="row"
-              spacing={1}
-              useFlexGap
-              flexWrap="wrap"
-              sx={{ justifyContent: "flex-start" }}
-            >
-              <Chip label={statusLabels[meeting.status]} size="small" color="primary" variant="outlined" />
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<CancelOutlinedIcon />}
-                onClick={() => setCancelDialogOpen(true)}
-                disabled={submitting}
-              >
-                ביטול פגישה
-              </Button>
-            </Stack>
-          </Stack>
-
-          {error && <Alert severity="error">{error}</Alert>}
-        </Stack>
-      </SurfaceCard>
-
-      <Dialog
-        open={cancelDialogOpen}
-        onClose={() => !submitting && setCancelDialogOpen(false)}
-        fullWidth
-        maxWidth="xs"
-        PaperProps={{ dir: "rtl", sx: { textAlign: "start" } }}
-      >
-        <DialogTitle sx={{ color: "primary.dark", fontWeight: 900 }}>ביטול פגישה</DialogTitle>
-        <DialogContent>
-          <DialogContentText>האם את בטוחה שברצונך לבטל את הפגישה?</DialogContentText>
-        </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={() => setCancelDialogOpen(false)} disabled={submitting}>
-            חזרה
-          </Button>
-          <Button variant="contained" onClick={cancelMeeting} disabled={submitting}>
-            ביטול פגישה
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </>
-  );
-}
-
-type MeetingsCancellationPanelProps = {
-  isMentor: boolean;
-  meetingRole: MeetingRole;
-  onMeetingRoleChange: (role: MeetingRole) => void;
-};
-
-function MeetingsCancellationPanel({
-  isMentor,
-  meetingRole,
-  onMeetingRoleChange,
-}: MeetingsCancellationPanelProps) {
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const canSwitchRoles = isMentor;
-  const effectiveRole = canSwitchRoles ? meetingRole : "mentee";
-  // Scheduled meetings are canceled exclusively from the home calendar (which enforces the
-  // mentee cancellation warning); this panel only handles pre-scheduled/other active statuses.
-  const activeMeetings = useMemo(
-    () => meetings.filter((meeting) => meeting.status !== "canceled" && meeting.status !== "scheduled"),
-    [meetings]
-  );
-
-  const loadMeetings = useCallback(async (role: MeetingRole) => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await api.get<{ meetings: Meeting[] }>(`/meetings/my?role=${role}`);
-      setMeetings(response.data.meetings);
-    } catch (err) {
-      setError(getApiErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!canSwitchRoles && meetingRole !== "mentee") {
-      onMeetingRoleChange("mentee");
-      return;
-    }
-
-    loadMeetings(effectiveRole);
-  }, [canSwitchRoles, effectiveRole, loadMeetings, meetingRole, onMeetingRoleChange]);
-
   return (
     <SurfaceCard dir="rtl" sx={{ textAlign: "start", width: "100%" }}>
-      <Stack spacing={2}>
-        <Box sx={{ textAlign: "start" }}>
-          <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
-            {`הפגישות שלי בתור ${meetingRoleLabels[effectiveRole]}`}
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            ביטול פגישות פעילות מהאזור האישי
-          </Typography>
-        </Box>
-
-        {canSwitchRoles && (
-          <ToggleButtonGroup
-            dir="rtl"
-            exclusive
-            size="small"
-            value={meetingRole}
-            onChange={(_event, nextRole: MeetingRole | null) => {
-              if (nextRole) {
-                onMeetingRoleChange(nextRole);
-              }
-            }}
-            sx={{
-              alignSelf: "stretch",
-              "& .MuiToggleButton-root": {
-                flex: 1,
-                minHeight: 36,
-                px: 1.5,
-                borderColor: "#f8bbd0",
-                color: "primary.dark",
-                fontWeight: 800,
-                whiteSpace: "nowrap",
-                "&.Mui-selected": {
-                  bgcolor: "primary.main",
-                  color: "#ffffff",
-                  "&:hover": {
-                    bgcolor: "primary.dark",
-                  },
+      <Stack spacing={1.5}>
+        <Typography variant="h6" sx={{ color: "primary.dark", fontWeight: 900 }}>
+          תצוגת אזור אישי
+        </Typography>
+        <ToggleButtonGroup
+          dir="rtl"
+          exclusive
+          size="small"
+          value={value}
+          onChange={(_event, nextRole: MeetingRole | null) => {
+            if (nextRole) {
+              onChange(nextRole);
+            }
+          }}
+          sx={{
+            alignSelf: "stretch",
+            "& .MuiToggleButton-root": {
+              flex: 1,
+              minHeight: 36,
+              px: 1.5,
+              borderColor: "#f8bbd0",
+              color: "primary.dark",
+              fontWeight: 800,
+              whiteSpace: "nowrap",
+              "&.Mui-selected": {
+                bgcolor: "primary.main",
+                color: "#ffffff",
+                "&:hover": {
+                  bgcolor: "primary.dark",
                 },
               },
-            }}
-          >
-            <ToggleButton value="mentee">בתור מנטית</ToggleButton>
-            <ToggleButton value="mentor">בתור מנטורית</ToggleButton>
-          </ToggleButtonGroup>
-        )}
-
-        <Divider />
-
-        {error && <Alert severity="error">{error}</Alert>}
-
-        {loading ? (
-          <Box sx={{ display: "grid", placeItems: "center", minHeight: 140 }}>
-            <CircularProgress size={28} />
-          </Box>
-        ) : activeMeetings.length === 0 ? (
-          <Typography color="text.secondary">אין פגישות פעילות לביטול כרגע.</Typography>
-        ) : (
-          <Stack spacing={1.5}>
-            {activeMeetings.map((meeting) => (
-              <MeetingCancellationCard
-                key={meeting._id}
-                meeting={meeting}
-                role={effectiveRole}
-                onCanceled={() => loadMeetings(effectiveRole)}
-              />
-            ))}
-          </Stack>
-        )}
+            },
+          }}
+        >
+          <ToggleButton value="mentee">בתור מנטית</ToggleButton>
+          <ToggleButton value="mentor">בתור מנטורית</ToggleButton>
+        </ToggleButtonGroup>
       </Stack>
     </SurfaceCard>
   );
@@ -477,9 +295,13 @@ export default function ProfilePage() {
   const [sectionSuccess, setSectionSuccess] = useState<Partial<Record<SectionKey, string>>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [handledProfileRouteQuery, setHandledProfileRouteQuery] = useState("");
 
   const isMentor = mentorProfile?.approvalStatus === "approved";
   const activeProfileRole = isMentor ? selectedMeetingRole : "mentee";
+  const requestedProfileRole = searchParams.get("role");
+  const requestedSummaryMeetingId = searchParams.get("summaryMeetingId");
+  const hasProfileRouteTarget = requestedProfileRole === "mentor" || Boolean(requestedSummaryMeetingId);
   const avatarSrc = profilePicturePreview || profilePicture || undefined;
 
   const setFormValue = (field: keyof ProfileForm, value: string) => {
@@ -523,6 +345,27 @@ export default function ProfilePage() {
       setSearchParams(next, { replace: true });
     }
   }, [loading, mentorProfile, searchParams, setSearchParams]);
+
+  useEffect(() => {
+    if (loading || !isMentor || !hasProfileRouteTarget) {
+      return;
+    }
+
+    const routeQueryKey = `${requestedProfileRole || ""}:${requestedSummaryMeetingId || ""}`;
+    if (handledProfileRouteQuery === routeQueryKey) {
+      return;
+    }
+
+    setSelectedMeetingRole("mentor");
+    setHandledProfileRouteQuery(routeQueryKey);
+  }, [
+    handledProfileRouteQuery,
+    hasProfileRouteTarget,
+    isMentor,
+    loading,
+    requestedProfileRole,
+    requestedSummaryMeetingId,
+  ]);
 
   const clearSectionMessages = useCallback((section: SectionKey) => {
     setSectionErrors((prev) => ({ ...prev, [section]: "" }));
@@ -833,18 +676,21 @@ export default function ProfilePage() {
       <Box
         sx={{
           display: "grid",
-          gridTemplateColumns: { xs: "1fr", lg: "minmax(0, 1040px) 360px" },
+          gridTemplateColumns: {
+            xs: "1fr",
+            lg: isMentor ? "minmax(0, 1040px) 360px" : "minmax(0, 1040px)",
+          },
           gap: 3,
           alignItems: "start",
           justifyContent: "center",
         }}
       >
+        {isMentor && (
         <Box sx={{ gridColumn: { xs: "auto", lg: 2 }, gridRow: { xs: "auto", lg: 1 } }}>
           <Stack spacing={3}>
-            <MeetingsCancellationPanel
-              isMentor={isMentor}
-              meetingRole={selectedMeetingRole}
-              onMeetingRoleChange={setSelectedMeetingRole}
+            <ProfileRoleSwitcher
+              value={selectedMeetingRole}
+              onChange={setSelectedMeetingRole}
             />
 
             {isMentor && activeProfileRole === "mentor" && (
@@ -866,8 +712,13 @@ export default function ProfilePage() {
                 </Stack>
               </SurfaceCard>
             )}
+
+            {activeProfileRole === "mentor" && (
+              <MentorMeetingHistory targetMeetingId={requestedSummaryMeetingId} />
+            )}
           </Stack>
         </Box>
+        )}
 
         <SurfaceCard
           dir="rtl"

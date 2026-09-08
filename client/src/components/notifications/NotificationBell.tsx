@@ -269,6 +269,20 @@ export default function NotificationBell() {
     navigate(notification.actionUrl || "/profile?availability=1");
   };
 
+  const handleMentorSummaryNotificationClick = (notification: NotificationItem) => {
+    const summaryUrl =
+      notification.actionUrl ||
+      (notification.meetingId
+        ? `/profile?role=mentor&summaryMeetingId=${notification.meetingId}`
+        : "");
+
+    if (!summaryUrl) return;
+
+    markAsRead(notification);
+    handleClose();
+    navigate(summaryUrl);
+  };
+
   const closeAvailabilityPrompt = (showFollowUp = true) => {
     if (showFollowUp && availabilityPrompt?.followUpMessage) {
       setToast(availabilityPrompt.followUpMessage);
@@ -422,26 +436,36 @@ export default function NotificationBell() {
                     notification.type === "availability_reminder" &&
                     notification.actionStatus !== "answered";
 
+                  const showMentorSummaryLink =
+                    notification.type === "mentor_post_meeting_thank_you" &&
+                    Boolean(notification.actionUrl || notification.meetingId);
+
                   const hasInteractiveActions =
                     showAttendanceActions ||
                     showFeedbackChoice ||
                     showFeedbackReminderAction ||
                     showRescheduleInquiry ||
                     showRescheduleReady ||
-                    showAvailabilityReminder;
+                    showAvailabilityReminder ||
+                    showMentorSummaryLink;
 
                   return (
                     <Box
                       key={notification._id}
                       onClick={() => {
-                        if (!hasInteractiveActions) {
+                        if (showMentorSummaryLink) {
+                          handleMentorSummaryNotificationClick(notification);
+                        } else if (!hasInteractiveActions) {
                           markAsRead(notification);
                         }
                       }}
                       sx={{
                         p: 1.25,
                         borderRadius: 1.5,
-                        cursor: notification.read || hasInteractiveActions ? "default" : "pointer",
+                        cursor:
+                          showMentorSummaryLink || (!notification.read && !hasInteractiveActions)
+                            ? "pointer"
+                            : "default",
                         backgroundColor: notification.read ? "transparent" : "#fce4ec",
                         border: "1px solid",
                         borderColor: notification.read ? "transparent" : "#f8bbd0",

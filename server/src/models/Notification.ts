@@ -6,6 +6,7 @@ export const notificationTypes = [
   "meeting_rejected",
   "meeting_canceled",
   "attendance_check",
+  "mentor_post_meeting_thank_you",
   "feedback_reminder",
   "attendance_discrepancy",
   "reschedule_inquiry",
