@@ -1,55 +1,16 @@
 import { Router } from "express";
 import mongoose from "mongoose";
 import { isAdmin, requireAuth } from "../middleware/auth";
-import { AvailabilityWindow } from "../models/AvailabilityWindow";
 import { Meeting, meetingStatuses } from "../models/Meeting";
 import { MentorProfile } from "../models/MentorProfile";
 import { Notification } from "../models/Notification";
 import { User } from "../models/User";
+import { getMeetingEndTime } from "../utils/meetingTime";
 
 const router = Router();
 
-const DEFAULT_MEETING_DURATION_MINUTES = 60;
 const MISSING_FEEDBACK_DAYS = 7;
 const OUTSTANDING_MENTOR_SESSION_THRESHOLD = 10;
-
-async function getMeetingEndTime(meeting: {
-  selectedTime?: Date;
-  mentorId: unknown;
-  availabilityWindowId?: unknown;
-}): Promise<Date | null> {
-  if (!meeting.selectedTime) {
-    return null;
-  }
-
-  if (meeting.availabilityWindowId) {
-    const windowId =
-      meeting.availabilityWindowId &&
-      typeof meeting.availabilityWindowId === "object" &&
-      "_id" in (meeting.availabilityWindowId as object)
-        ? (meeting.availabilityWindowId as { _id: unknown })._id
-        : meeting.availabilityWindowId;
-    const window = await AvailabilityWindow.findById(windowId);
-    if (window) {
-      return new Date(`${window.date}T${window.endTime}:00`);
-    }
-  }
-
-  const mentorUserId =
-    meeting.mentorId &&
-    typeof meeting.mentorId === "object" &&
-    "_id" in (meeting.mentorId as object)
-      ? (meeting.mentorId as { _id: unknown })._id
-      : meeting.mentorId;
-
-  const mentorProfile = await MentorProfile.findOne({ userId: mentorUserId });
-  const durationMinutes =
-    mentorProfile?.meetingLength && mentorProfile.meetingLength > 0
-      ? mentorProfile.meetingLength
-      : DEFAULT_MEETING_DURATION_MINUTES;
-
-  return new Date(meeting.selectedTime.getTime() + durationMinutes * 60 * 1000);
-}
 
 router.use(requireAuth, isAdmin);
 
