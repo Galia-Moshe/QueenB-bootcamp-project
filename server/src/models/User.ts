@@ -10,6 +10,8 @@ export type UserDocument = {
   role: UserRole;
   programmingLanguages: string[];
   techStack: string[];
+  /** Topics the mentee wants help with — used for mentor match scoring. */
+  desiredTopics: string[];
   jobTitle?: string;
   company?: string;
   yearsOfExperience?: number;
@@ -48,6 +50,10 @@ const userSchema = new Schema<UserDocument>(
       default: [],
     },
     techStack: {
+      type: [String],
+      default: [],
+    },
+    desiredTopics: {
       type: [String],
       default: [],
     },

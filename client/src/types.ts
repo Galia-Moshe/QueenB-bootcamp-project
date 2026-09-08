@@ -7,6 +7,8 @@ export type User = {
   role: UserRole;
   programmingLanguages: string[];
   techStack: string[];
+  /** Topics the mentee wants help with — used for mentor match scoring. */
+  desiredTopics?: string[];
   jobTitle?: string;
   company?: string;
   yearsOfExperience?: number;
@@ -32,6 +34,10 @@ export type MentorProfile = {
   rejectionReason?: string | null;
   isViewedByAdmin?: boolean;
   hasAvailability?: boolean;
+  /** Overlap size between mentee interests and this mentor's topics (from GET /mentors). */
+  matchScore?: number;
+  /** Specific topics that overlapped with the mentee's interests. */
+  matchedTopics?: string[];
   createdAt?: string;
   updatedAt?: string;
 };
