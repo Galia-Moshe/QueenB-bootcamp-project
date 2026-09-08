@@ -9,7 +9,9 @@ import {
   Stack,
   TextField,
   Typography,
+  useMediaQuery,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import SearchIcon from "@mui/icons-material/Search";
 import { api, getApiErrorMessage } from "../api";
@@ -26,7 +28,7 @@ import PageHero from "../components/ui/PageHero";
 import SurfaceCard from "../components/ui/SurfaceCard";
 import type { Meeting, MeetingStatus, MentorProfile, MentorsPagination, User } from "../types";
 
-const PAGE_LIMIT = 12;
+const PAGE_LIMIT = 9;
 const SEARCH_DEBOUNCE_MS = 300;
 
 const ACTIVE_MEETING_STATUSES: MeetingStatus[] = [
@@ -88,6 +90,8 @@ function buildMentorsQuery(params: {
 
 export default function MentorsPage() {
   const { user } = useAuth();
+  const theme = useTheme();
+  const isSmallScreen = useMediaQuery(theme.breakpoints.down("sm"));
   const [mentors, setMentors] = useState<MentorProfile[]>([]);
   const [pagination, setPagination] = useState<MentorsPagination>({
     page: 1,
@@ -220,6 +224,18 @@ export default function MentorsPage() {
   };
 
   const activeFilterCount = countActiveFilters(filters);
+  const totalPages = pagination.totalPages;
+  const currentPage = totalPages > 0 ? Math.min(page, totalPages) : 1;
+  const showPaginationControls = totalPages > 1;
+  const canGoPrevious = currentPage > 1;
+  const canGoNext = currentPage < totalPages;
+
+  const handlePageChange = (nextPage: number) => {
+    const clampedPage = Math.min(Math.max(nextPage, 1), totalPages);
+    if (clampedPage !== page) {
+      setPage(clampedPage);
+    }
+  };
 
   return (
     <Stack spacing={3} sx={{ width: "100%" }}>
@@ -290,14 +306,53 @@ export default function MentorsPage() {
             })}
           </CenteredContent>
 
-          {pagination.totalPages > 1 && (
+          {showPaginationControls && (
             <Box sx={{ display: "flex", justifyContent: "center" }}>
-              <Pagination
-                color="primary"
-                page={pagination.page}
-                count={pagination.totalPages}
-                onChange={(_event, nextPage) => setPage(nextPage)}
-              />
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                spacing={1.25}
+                alignItems="center"
+                justifyContent="center"
+                sx={{ width: "100%" }}
+              >
+                <Button
+                  variant="outlined"
+                  disabled={!canGoPrevious}
+                  onClick={() => handlePageChange(currentPage - 1)}
+                  sx={{ minWidth: { xs: "100%", sm: 104 } }}
+                >
+                  Previous
+                </Button>
+                <Pagination
+                  color="primary"
+                  count={totalPages}
+                  page={currentPage}
+                  hidePrevButton
+                  hideNextButton
+                  siblingCount={isSmallScreen ? 0 : 1}
+                  boundaryCount={1}
+                  size={isSmallScreen ? "small" : "medium"}
+                  onChange={(_event, nextPage) => handlePageChange(nextPage)}
+                  sx={{
+                    "& .MuiPagination-ul": {
+                      justifyContent: "center",
+                      flexWrap: "wrap",
+                      gap: 0.5,
+                    },
+                    "& .MuiPaginationItem-root": {
+                      fontWeight: 800,
+                    },
+                  }}
+                />
+                <Button
+                  variant="outlined"
+                  disabled={!canGoNext}
+                  onClick={() => handlePageChange(currentPage + 1)}
+                  sx={{ minWidth: { xs: "100%", sm: 104 } }}
+                >
+                  Next
+                </Button>
+              </Stack>
             </Box>
           )}
         </>
