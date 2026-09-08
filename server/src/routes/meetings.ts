@@ -10,6 +10,7 @@ import {
   confirmAttendanceFromToken,
   queueAttendanceReminderCheck,
 } from "../services/meetingReminderService";
+import { hasMeetingEnded } from "../utils/meetingTime";
 
 const router = Router();
 
@@ -25,6 +26,15 @@ const ACTIVE_MEETING_WITH_MENTOR_ERROR = {
     "יש לך כבר פגישה עתידית או בקשה ממתינה עם המנטורית הזו. לא ניתן לקבוע פגישה נוספת עד שהיא תסתיים.",
   message: "You already have an active meeting scheduled with this mentor.",
 } as const;
+
+const MENTOR_HISTORY_STATUSES = [
+  "scheduled",
+  "attendance_confirmed",
+  "completed",
+  "feedback_submitted",
+  "disputed",
+] as const;
+const MEETING_SUMMARY_MAX_LENGTH = 5000;
 
 function isSameId(first: unknown, second: unknown) {
   return String(first) === String(second);
@@ -44,6 +54,81 @@ function idOf(value: unknown) {
     return String((value as { _id: unknown })._id);
   }
   return String(value);
+}
+
+function userNameOf(value: unknown) {
+  if (value && typeof value === "object" && "username" in value) {
+    const username = (value as { username?: unknown }).username;
+    return typeof username === "string" ? username : "";
+  }
+
+  return "";
+}
+
+function parseHistoryLimit(value: unknown) {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  const rawValue = Array.isArray(value) ? value[0] : value;
+  const limit = Number(rawValue);
+
+  if (!Number.isFinite(limit) || limit <= 0) {
+    return undefined;
+  }
+
+  return Math.min(Math.floor(limit), 100);
+}
+
+function normalizeSearch(value: string) {
+  return value.trim().toLocaleLowerCase("he-IL");
+}
+
+function isMentorHistoryStatus(status: MeetingDocument["status"]) {
+  return MENTOR_HISTORY_STATUSES.includes(status as (typeof MENTOR_HISTORY_STATUSES)[number]);
+}
+
+async function populateMentorHistoryMeeting(meeting: HydratedDocument<MeetingDocument>) {
+  await meeting.populate([
+    { path: "mentorId", select: "-passwordHash" },
+    { path: "menteeId", select: "-passwordHash" },
+    { path: "availabilityWindowId" },
+  ]);
+
+  return meeting;
+}
+
+async function findMentorSummaryMeeting(
+  meetingId: string,
+  mentorId: unknown,
+  now = new Date()
+): Promise<
+  | { ok: true; meeting: HydratedDocument<MeetingDocument> }
+  | { ok: false; status: number; error: string }
+> {
+  if (!mongoose.Types.ObjectId.isValid(meetingId)) {
+    return { ok: false, status: 404, error: "הפגישה לא נמצאה" };
+  }
+
+  const meeting = await Meeting.findById(meetingId).select("+mentorSummary");
+
+  if (!meeting) {
+    return { ok: false, status: 404, error: "הפגישה לא נמצאה" };
+  }
+
+  if (!isSameId(meeting.mentorId, mentorId)) {
+    return { ok: false, status: 403, error: "אין לך הרשאה לצפות בסיכום הפגישה הזו" };
+  }
+
+  if (!isMentorHistoryStatus(meeting.status) || !(await hasMeetingEnded(meeting, now))) {
+    return {
+      ok: false,
+      status: 409,
+      error: "אפשר לכתוב סיכום רק לפגישה שהסתיימה ולא בוטלה",
+    };
+  }
+
+  return { ok: true, meeting: await populateMentorHistoryMeeting(meeting) };
 }
 
 /** Both sides confirmed attendance (status and/or attendanceResponses). */
@@ -386,6 +471,108 @@ router.get("/my", requireAuth, async (req: AuthRequest, res, next) => {
     }));
 
     return res.json({ meetings: meetingsWithCancellationCount });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/mentor-history", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const now = new Date();
+    const search =
+      typeof req.query.search === "string" ? normalizeSearch(req.query.search) : "";
+    const limit = parseHistoryLimit(req.query.limit);
+
+    const candidates = (await Meeting.find({
+      mentorId: req.user!._id,
+      status: { $in: [...MENTOR_HISTORY_STATUSES] },
+      selectedTime: { $exists: true, $lte: now },
+    })
+      .select("+mentorSummary")
+      .populate("mentorId", "-passwordHash")
+      .populate("menteeId", "-passwordHash")
+      .populate("availabilityWindowId")
+      .sort({ selectedTime: -1, updatedAt: -1 })) as HydratedDocument<MeetingDocument>[];
+
+    const completedMeetings: HydratedDocument<MeetingDocument>[] = [];
+
+    for (const meeting of candidates) {
+      if (!(await hasMeetingEnded(meeting, now))) {
+        continue;
+      }
+
+      if (search && !normalizeSearch(userNameOf(meeting.menteeId)).includes(search)) {
+        continue;
+      }
+
+      completedMeetings.push(meeting);
+    }
+
+    const meetings =
+      typeof limit === "number" ? completedMeetings.slice(0, limit) : completedMeetings;
+
+    return res.json({
+      meetings: meetings.map((meeting) => meeting.toObject()),
+      total: completedMeetings.length,
+      hasMore: typeof limit === "number" ? completedMeetings.length > limit : false,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.get("/:id/summary", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const result = await findMentorSummaryMeeting(req.params.id, req.user!._id);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error });
+    }
+
+    return res.json({ meeting: result.meeting });
+  } catch (error) {
+    next(error);
+  }
+});
+
+router.patch("/:id/summary", requireAuth, async (req: AuthRequest, res, next) => {
+  try {
+    const content = typeof req.body.content === "string" ? req.body.content.trim() : "";
+
+    if (!content) {
+      return res.status(400).json({ error: "יש להזין סיכום פגישה" });
+    }
+
+    if (content.length > MEETING_SUMMARY_MAX_LENGTH) {
+      return res.status(400).json({ error: "סיכום הפגישה ארוך מדי" });
+    }
+
+    const result = await findMentorSummaryMeeting(req.params.id, req.user!._id);
+
+    if (!result.ok) {
+      return res.status(result.status).json({ error: result.error });
+    }
+
+    const now = new Date();
+    result.meeting.mentorSummary = {
+      content,
+      createdAt: result.meeting.mentorSummary?.createdAt ?? now,
+      updatedAt: now,
+    };
+    result.meeting.markModified("mentorSummary");
+    await result.meeting.save();
+    await populateMentorHistoryMeeting(result.meeting);
+
+    await Notification.updateMany(
+      {
+        recipient: req.user!._id,
+        meetingId: result.meeting._id,
+        type: "mentor_post_meeting_thank_you",
+      },
+      { $set: { actionStatus: "answered", read: true } }
+    );
+
+    return res.json({ meeting: result.meeting });
   } catch (error) {
     next(error);
   }

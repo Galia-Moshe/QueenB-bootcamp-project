@@ -1,10 +1,11 @@
 import cron from "node-cron";
-import { AvailabilityWindow } from "../models/AvailabilityWindow";
-import { Meeting } from "../models/Meeting";
-import { MentorProfile } from "../models/MentorProfile";
+import type { HydratedDocument } from "mongoose";
+import { Meeting, type MeetingDocument } from "../models/Meeting";
 import { Notification } from "../models/Notification";
+import { User } from "../models/User";
+import { getMeetingEndTime } from "../utils/meetingTime";
 
-const DEFAULT_MEETING_DURATION_MINUTES = 60;
+const MENTOR_POST_MEETING_NOTIFICATION_TYPE = "mentor_post_meeting_thank_you" as const;
 
 function formatMeetingDateTime(date: Date) {
   return new Intl.DateTimeFormat("he-IL", {
@@ -13,35 +14,56 @@ function formatMeetingDateTime(date: Date) {
   }).format(date);
 }
 
-async function getMeetingEndTime(meeting: {
-  selectedTime?: Date;
-  mentorId: unknown;
-  availabilityWindowId?: unknown;
-}): Promise<Date | null> {
-  if (!meeting.selectedTime) {
-    return null;
+function postMeetingNotificationNotSentFilter() {
+  return [
+    { mentorPostMeetingNotificationSentAt: { $exists: false } },
+    { mentorPostMeetingNotificationSentAt: null },
+  ];
+}
+
+async function sendMentorPostMeetingNotification(
+  meeting: HydratedDocument<MeetingDocument>,
+  now: Date
+) {
+  const mentee = await User.findById(meeting.menteeId).select("username");
+  const menteeName = mentee?.username.trim();
+
+  if (!menteeName) {
+    return false;
   }
 
-  if (meeting.availabilityWindowId) {
-    const window = await AvailabilityWindow.findById(meeting.availabilityWindowId);
-    if (window) {
-      return new Date(`${window.date}T${window.endTime}:00`);
-    }
+  const claimed = await Meeting.findOneAndUpdate(
+    {
+      _id: meeting._id,
+      status: "scheduled",
+      selectedTime: meeting.selectedTime,
+      $or: postMeetingNotificationNotSentFilter(),
+    },
+    { $set: { mentorPostMeetingNotificationSentAt: now } },
+    { new: true }
+  );
+
+  if (!claimed) {
+    return false;
   }
 
-  const mentorProfile = await MentorProfile.findOne({ userId: meeting.mentorId });
-  const durationMinutes =
-    mentorProfile?.meetingLength && mentorProfile.meetingLength > 0
-      ? mentorProfile.meetingLength
-      : DEFAULT_MEETING_DURATION_MINUTES;
+  await Notification.create({
+    recipient: claimed.mentorId,
+    type: MENTOR_POST_MEETING_NOTIFICATION_TYPE,
+    meetingId: claimed._id,
+    message: `תודה שהשקעת מזמנך לתת ייעוץ ל${menteeName} 💜\nאם תרצי לכתוב סיכום לפגישה הזו, לחצי כאן.`,
+    actionUrl: `/profile?role=mentor&summaryMeetingId=${String(claimed._id)}`,
+    actionStatus: "pending",
+  });
 
-  return new Date(meeting.selectedTime.getTime() + durationMinutes * 60 * 1000);
+  return true;
 }
 
 /**
  * Every minute: find scheduled meetings whose end time
  * (selectedTime + duration) has passed, send attendance-check
- * notifications to mentor and mentee, and set attendancePromptedAt.
+ * notifications to mentor and mentee, send a mentor thank-you,
+ * and set the corresponding sent timestamps.
  */
 export function startAttendanceCheckJob() {
   cron.schedule("* * * * *", async () => {
@@ -51,10 +73,14 @@ export function startAttendanceCheckJob() {
       const candidates = await Meeting.find({
         status: "scheduled",
         selectedTime: { $exists: true, $lte: now },
-        attendancePromptedAt: { $exists: false },
+        $or: [
+          { attendancePromptedAt: { $exists: false } },
+          ...postMeetingNotificationNotSentFilter(),
+        ],
       });
 
       let promptedCount = 0;
+      let thankedMentorCount = 0;
 
       for (const meeting of candidates) {
         const endTime = await getMeetingEndTime(meeting);
@@ -75,32 +101,37 @@ export function startAttendanceCheckJob() {
           { new: true }
         );
 
-        if (!claimed) {
-          continue;
+        if (claimed) {
+          await Notification.create([
+            {
+              recipient: claimed.mentorId,
+              type: "attendance_check",
+              meetingId: claimed._id,
+              message,
+              actionStatus: "pending",
+            },
+            {
+              recipient: claimed.menteeId,
+              type: "attendance_check",
+              meetingId: claimed._id,
+              message,
+              actionStatus: "pending",
+            },
+          ]);
+
+          promptedCount += 1;
         }
 
-        await Notification.create([
-          {
-            recipient: claimed.mentorId,
-            type: "attendance_check",
-            meetingId: claimed._id,
-            message,
-            actionStatus: "pending",
-          },
-          {
-            recipient: claimed.menteeId,
-            type: "attendance_check",
-            meetingId: claimed._id,
-            message,
-            actionStatus: "pending",
-          },
-        ]);
-
-        promptedCount += 1;
+        if (await sendMentorPostMeetingNotification(meeting, now)) {
+          thankedMentorCount += 1;
+        }
       }
 
       if (promptedCount > 0) {
         console.log(`Attendance check: prompted ${promptedCount} meeting(s)`);
+      }
+      if (thankedMentorCount > 0) {
+        console.log(`Post-meeting thank-you: notified ${thankedMentorCount} mentor(s)`);
       }
     } catch (error) {
       console.error("Attendance check job failed", error);

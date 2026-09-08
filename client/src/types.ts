@@ -105,6 +105,11 @@ export type Meeting = {
     mentor: AttendanceResponseValue | null;
     mentee: AttendanceResponseValue | null;
   };
+  mentorSummary?: {
+    content: string;
+    createdAt?: string;
+    updatedAt?: string;
+  };
   feedbacks: Array<{
     fromUserId: User | string;
     role: "mentor" | "mentee";
@@ -124,6 +129,7 @@ export type NotificationType =
   | "meeting_rejected"
   | "meeting_canceled"
   | "attendance_check"
+  | "mentor_post_meeting_thank_you"
   | "feedback_reminder"
   | "attendance_discrepancy"
   | "reschedule_inquiry"

@@ -19,6 +19,12 @@ type Feedback = {
   content: string;
 };
 
+export type MentorMeetingSummary = {
+  content: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+};
+
 export type MeetingParticipantRole = "mentor" | "mentee";
 
 export type AttendanceConfirmationState = {
@@ -58,6 +64,8 @@ export type MeetingDocument = {
   attendanceConfirmation: AttendanceConfirmation;
   topics?: string[];
   attendancePromptedAt?: Date;
+  mentorPostMeetingNotificationSentAt?: Date;
+  mentorSummary?: MentorMeetingSummary;
   feedbackReminderAt?: Date;
   availabilityReminderAt?: Date;
   attendanceResponses: AttendanceResponses;
@@ -125,6 +133,19 @@ const attendanceResponsesSchema = new Schema<AttendanceResponses>(
   { _id: false }
 );
 
+const mentorMeetingSummarySchema = new Schema<MentorMeetingSummary>(
+  {
+    content: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    createdAt: Date,
+    updatedAt: Date,
+  },
+  { _id: false }
+);
+
 const meetingSchema = new Schema<MeetingDocument>(
   {
     mentorId: {
@@ -167,6 +188,12 @@ const meetingSchema = new Schema<MeetingDocument>(
       default: undefined,
     },
     attendancePromptedAt: Date,
+    mentorPostMeetingNotificationSentAt: Date,
+    mentorSummary: {
+      type: mentorMeetingSummarySchema,
+      default: undefined,
+      select: false,
+    },
     feedbackReminderAt: Date,
     availabilityReminderAt: Date,
     attendanceResponses: {
