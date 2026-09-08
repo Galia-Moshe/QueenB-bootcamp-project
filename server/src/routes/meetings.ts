@@ -600,14 +600,15 @@ router.patch("/:id/reject", requireAuth, async (req: AuthRequest, res, next) => 
       return res.status(409).json({ error: "הבקשה כבר טופלה" });
     }
 
-    // Atomically release the slot: only the rejection that finds it still "pending" may proceed.
-    const releasedWindow = await AvailabilityWindow.findOneAndUpdate(
-      { _id: availabilityWindow._id, status: "pending" },
-      { $set: { status: "available" } },
-      { new: true }
-    );
+    // Atomically claim the rejection: only the request that finds the slot still "pending" may proceed.
+    // A rejection permanently closes the slot (deleted), same as a mentor cancellation of a
+    // scheduled meeting — the mentor no longer wants that time booked.
+    const deletedWindow = await AvailabilityWindow.findOneAndDelete({
+      _id: availabilityWindow._id,
+      status: "pending",
+    });
 
-    if (!releasedWindow) {
+    if (!deletedWindow) {
       return res.status(409).json({ error: "הבקשה כבר טופלה" });
     }
 
@@ -618,20 +619,23 @@ router.patch("/:id/reject", requireAuth, async (req: AuthRequest, res, next) => 
     );
 
     if (!canceledMeeting) {
-      // The meeting moved out of the pending state concurrently: undo the window release
-      // rather than leaving an "available" window whose meeting was never actually canceled.
-      // Guarded on "available" so it never clobbers a slot another mentee has since re-booked.
-      await AvailabilityWindow.findOneAndUpdate(
-        { _id: releasedWindow._id, status: "available" },
-        { $set: { status: "pending" } }
-      );
+      // The meeting moved out of the pending state concurrently: recreate the deleted window
+      // rather than leaving a meeting that was never actually canceled with no matching window.
+      await AvailabilityWindow.create({
+        _id: deletedWindow._id,
+        mentorId: deletedWindow.mentorId,
+        date: deletedWindow.date,
+        startTime: deletedWindow.startTime,
+        endTime: deletedWindow.endTime,
+        status: "pending",
+      });
       return res.status(409).json({ error: "הבקשה כבר טופלה" });
     }
 
     await Notification.create({
       recipient: canceledMeeting.menteeId,
       type: "meeting_rejected",
-      message: `בקשתך לפגישה בתאריך ${formatWindowDate(releasedWindow.date)} בשעה ${releasedWindow.startTime}–${releasedWindow.endTime} נדחתה`,
+      message: `בקשתך לפגישה בתאריך ${formatWindowDate(deletedWindow.date)} בשעה ${deletedWindow.startTime}–${deletedWindow.endTime} נדחתה`,
     });
 
     const populatedMeeting = await Meeting.findById(canceledMeeting._id)
